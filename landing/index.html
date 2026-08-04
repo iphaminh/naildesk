@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NailDesk · The front desk and customer brain for nail salons</title>
+<meta name="description" content="Run the whole salon from one screen. Checkout, customer history, automatic rewards, revenue reports and a radar for regulars who are slipping away.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;600;700;800&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --cream:#FBFAF7; --paper:#FFFFFF; --ink:#1E1A16; --ink2:#6B6459; --ink3:#9A9184;
+  --bronze:#A47C52; --gold:#c9a87c; --gold-soft:#F4EBDE; --line:#E5E0D6; --dark:#141210;
+  --r:18px;
+}
+html{scroll-behavior:smooth}
+body{font-family:'Hanken Grotesk',sans-serif;background:var(--cream);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased}
+.serif{font-family:'Cormorant Garamond',serif}
+.wrap{max-width:1080px;margin:0 auto;padding:0 22px}
+a{text-decoration:none;color:inherit}
+
+nav{position:sticky;top:0;z-index:50;background:rgba(251,250,247,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.nav-in{display:flex;align-items:center;justify-content:space-between;height:64px}
+.logo{font-weight:700;font-size:21px;letter-spacing:-.02em}
+.logo em{font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--bronze);font-weight:600;font-size:24px}
+.nav-links{display:flex;gap:26px;align-items:center;font-size:14.5px;color:var(--ink2)}
+.nav-links a:hover{color:var(--ink)}
+.btn{display:inline-block;background:var(--dark);color:#F5F0EA;border:none;border-radius:999px;padding:12px 24px;font-size:14.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:transform .15s, box-shadow .15s}
+.btn:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(20,18,16,.18)}
+.btn.gold{background:var(--bronze);color:#FFF9F2}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn.big{padding:16px 32px;font-size:16px}
+@media(max-width:720px){.nav-links a.hide-m{display:none}}
+
+.hero{padding:76px 0 30px;text-align:center}
+.eyebrow{display:inline-block;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--bronze);font-weight:700;margin-bottom:20px}
+h1{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:clamp(38px,6.2vw,64px);line-height:1.08;letter-spacing:-.01em;max-width:860px;margin:0 auto 22px}
+h1 em{font-style:italic;color:var(--bronze)}
+.sub{font-size:clamp(16px,2.2vw,19px);color:var(--ink2);max-width:600px;margin:0 auto 32px}
+.cta-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:14px}
+.micro{font-size:12.5px;color:var(--ink3)}
+
+/* hero mockup: dashboard window */
+.mock-stage{margin:52px auto 0;max-width:940px;position:relative;padding:0 10px}
+.window{background:var(--paper);border:1px solid var(--line);border-radius:20px;box-shadow:0 30px 80px rgba(30,26,22,.14);max-width:720px;margin:0 auto;overflow:hidden;text-align:left;position:relative;z-index:2}
+.w-bar{display:flex;align-items:center;gap:8px;background:#111;padding:12px 16px}
+.w-dot{width:10px;height:10px;border-radius:50%}
+.w-url{margin-left:10px;background:#241f18;color:#b7ab97;font-size:11.5px;border-radius:8px;padding:5px 14px;letter-spacing:.04em}
+.w-url em{color:var(--gold);font-style:normal}
+.w-body{padding:20px}
+.w-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+@media(max-width:560px){.w-cards{grid-template-columns:1fr}}
+.w-card{border:1px solid var(--line);border-radius:12px;padding:13px 15px}
+.w-label{font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink3);font-weight:700;margin-bottom:4px}
+.w-val{font-size:22px;font-weight:800;letter-spacing:-.02em}
+.w-hint{font-size:11px;color:var(--ink3);margin-top:2px}
+.w-badges{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
+.w-badge{font-size:9.5px;font-weight:700;border-radius:999px;padding:2px 8px}
+.w-badge.vip{background:var(--gold-soft);color:var(--bronze)}
+.w-badge.loyal{background:#E7EDF4;color:#3B6EA5}
+.w-badge.new{background:#E5F1E8;color:#2E8B57}
+.w-sec{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink3);font-weight:700;margin:14px 0 6px}
+.w-row{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line);font-size:13px}
+.w-row:last-child{border-bottom:none}
+.w-row b{font-weight:600}
+.w-row .muted{color:var(--ink3);font-size:11.5px}
+.w-pill{margin-left:auto;font-size:11px;font-weight:700;background:#FAE5E5;color:#C04545;border-radius:999px;padding:3px 10px;white-space:nowrap}
+.w-pill.ok{background:var(--gold-soft);color:var(--bronze)}
+.chip{position:absolute;background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:9px 16px;font-size:12.5px;font-weight:600;box-shadow:0 10px 30px rgba(30,26,22,.12);white-space:nowrap;z-index:3}
+.chip small{display:block;font-weight:500;color:var(--ink3);font-size:10.5px}
+.chip.c1{top:8%;left:max(1%, calc(50% - 430px));animation:float 5s ease-in-out infinite}
+.chip.c2{top:34%;right:max(1%, calc(50% - 435px));animation:float 6s ease-in-out .8s infinite}
+.chip.c3{bottom:12%;left:max(2%, calc(50% - 420px));animation:float 5.5s ease-in-out .4s infinite}
+@keyframes float{50%{transform:translateY(-8px)}}
+@media(max-width:900px){.chip{display:none}}
+
+.story{background:var(--dark);color:#EFE9E1;padding:96px 0;text-align:center;margin-top:84px}
+.story p{font-family:'Cormorant Garamond',serif;font-size:clamp(24px,4vw,38px);line-height:1.35;max-width:800px;margin:0 auto}
+.story p em{font-style:italic;color:var(--gold)}
+.story .fade{opacity:.45;font-size:clamp(17px,2.4vw,22px);margin-top:22px;font-family:'Hanken Grotesk',sans-serif}
+
+section{padding:90px 0}
+.sec-head{text-align:center;max-width:660px;margin:0 auto 56px}
+h2{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:clamp(30px,4.4vw,44px);line-height:1.12;margin-bottom:14px}
+h2 em{font-style:italic;color:var(--bronze)}
+.sec-sub{color:var(--ink2);font-size:16.5px}
+
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+@media(max-width:820px){.steps{grid-template-columns:1fr}}
+.step{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:28px 24px}
+.step-num{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:34px;color:var(--gold);line-height:1;margin-bottom:14px}
+.step h3{font-size:18px;font-weight:700;margin-bottom:8px}
+.step p{font-size:14.5px;color:var(--ink2)}
+.step .viz{height:150px;border-radius:12px;background:var(--gold-soft);margin-bottom:18px;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+
+.split{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:stretch}
+@media(max-width:820px){.split{grid-template-columns:1fr}}
+.pane{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:30px 26px}
+.pane .tag{display:inline-block;font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;padding:6px 13px;border-radius:999px;margin-bottom:18px}
+.pane.desk .tag{background:var(--gold-soft);color:var(--bronze)}
+.pane.owner .tag{background:#EDEAE4;color:var(--ink2)}
+.pane h3{font-size:21px;font-weight:700;margin-bottom:8px}
+.pane>p{font-size:14.5px;color:var(--ink2);margin-bottom:20px}
+.dash-row{display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.dash-row:last-child{border-bottom:none}
+.dash-ico{width:34px;height:26px;background:#EDEAE4;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.dash-row b{font-weight:600}
+.dash-row .val{margin-left:auto;color:var(--bronze);font-weight:700;white-space:nowrap}
+
+.feats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:820px){.feats{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.feats{grid-template-columns:1fr}}
+.feat{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:24px 22px}
+.feat .ico{width:40px;height:40px;border-radius:12px;background:var(--gold-soft);display:flex;align-items:center;justify-content:center;font-size:18px;margin-bottom:14px}
+.feat h3{font-size:16px;font-weight:700;margin-bottom:6px}
+.feat p{font-size:13.5px;color:var(--ink2)}
+
+.proof{background:var(--paper);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.proof-in{display:grid;grid-template-columns:1.1fr .9fr;gap:44px;align-items:center}
+@media(max-width:820px){.proof-in{grid-template-columns:1fr}}
+.proof h2{text-align:left}
+.proof p{color:var(--ink2);font-size:15.5px;margin-bottom:14px}
+.stat-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+.stat{background:var(--cream);border:1px solid var(--line);border-radius:14px;padding:14px 18px}
+.stat b{display:block;font-size:20px;font-weight:800}
+.stat span{font-size:12px;color:var(--ink3)}
+
+.plans{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;align-items:stretch}
+@media(max-width:960px){.plans{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.plans{grid-template-columns:1fr}}
+.plan{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:26px 22px;display:flex;flex-direction:column}
+.plan.hot{border:2px solid var(--bronze);position:relative;box-shadow:0 20px 50px rgba(164,124,82,.14)}
+.hot-tag{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--bronze);color:#FFF9F2;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;border-radius:999px;padding:5px 14px}
+.plan h3{font-size:15px;font-weight:700;margin-bottom:6px}
+.plan .price{font-size:34px;font-weight:800;letter-spacing:-.02em}
+.plan .price small{font-size:13px;color:var(--ink3);font-weight:500}
+.plan ul{list-style:none;margin:16px 0 22px;flex:1}
+.plan li{font-size:13.5px;color:var(--ink2);padding:5px 0 5px 22px;position:relative}
+.plan li::before{content:'✓';position:absolute;left:0;color:var(--bronze);font-weight:700}
+.plan .btn{width:100%;text-align:center}
+.pricing-note{text-align:center;color:var(--ink3);font-size:12.5px;margin-top:18px}
+
+.faq{max-width:680px;margin:0 auto}
+.q{border-bottom:1px solid var(--line)}
+.q button{width:100%;background:none;border:none;font-family:inherit;font-size:16px;font-weight:600;color:var(--ink);text-align:left;padding:20px 34px 20px 2px;cursor:pointer;position:relative}
+.q button::after{content:'+';position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:22px;color:var(--bronze);font-weight:400;transition:transform .2s}
+.q.open button::after{transform:translateY(-50%) rotate(45deg)}
+.q .a{max-height:0;overflow:hidden;transition:max-height .3s ease}
+.q.open .a{max-height:240px}
+.q .a p{font-size:14.5px;color:var(--ink2);padding:0 8px 20px 2px}
+
+.final{background:var(--dark);color:#EFE9E1;text-align:center;padding:110px 0}
+.final h2{color:#F5F0EA}
+.final .sub{color:#B8AD9C;margin-bottom:34px}
+footer{background:var(--dark);color:#8a8378;border-top:1px solid #2a2620;padding:34px 0;font-size:13px}
+.foot-in{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px}
+.foot-in .logo{color:#EFE9E1;font-size:17px}
+.foot-links{display:flex;gap:20px}
+.foot-links a:hover{color:#EFE9E1}
+
+.rv{opacity:0;transform:translateY(22px);transition:opacity .7s ease, transform .7s ease}
+.rv.in{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap nav-in">
+    <a class="logo" href="#top">Nail<em>desk</em></a>
+    <div class="nav-links">
+      <a href="#how" class="hide-m">How it works</a>
+      <a href="#pricing" class="hide-m">Pricing</a>
+      <a href="#faq" class="hide-m">FAQ</a>
+      <a class="btn" href="mailto:nailbyminh@gmail.com?subject=NailDesk%20early%20access">Get early access</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <span class="eyebrow">The front desk and customer brain for nail salons</span>
+    <h1>Run the whole salon from <em>one screen</em>.</h1>
+    <p class="sub">Checkout, customer history, automatic rewards and honest numbers. NailDesk remembers every client so you can take care of every client.</p>
+    <div class="cta-row">
+      <a class="btn big gold" href="mailto:nailbyminh@gmail.com?subject=NailDesk%20early%20access">Get early access</a>
+      <a class="btn big ghost" href="#how">See how it works</a>
+    </div>
+    <div class="micro">Works on any computer, tablet or salon iPad. Nothing to install.</div>
+
+    <div class="mock-stage">
+      <div class="chip c1">⚠️ Carol, VIP, away 45 days<small>one text wins her back</small></div>
+      <div class="chip c2">💰 Ticket closed, $95<small>points added by themselves</small></div>
+      <div class="chip c3">🏆 810 customers, sorted<small>imported from the old POS</small></div>
+      <div class="window">
+        <div class="w-bar">
+          <span class="w-dot" style="background:#E0655A"></span>
+          <span class="w-dot" style="background:#E0B25A"></span>
+          <span class="w-dot" style="background:#69B36A"></span>
+          <span class="w-url">naildesk · <em>dashboard</em></span>
+        </div>
+        <div class="w-body">
+          <div class="w-cards">
+            <div class="w-card">
+              <div class="w-label">Today</div>
+              <div class="w-val">$1,230</div>
+              <div class="w-hint">14 tickets · $180 tips</div>
+            </div>
+            <div class="w-card">
+              <div class="w-label">This month</div>
+              <div class="w-val">$18,540</div>
+              <div class="w-hint">up from last month</div>
+            </div>
+            <div class="w-card">
+              <div class="w-label">Customers</div>
+              <div class="w-val">810</div>
+              <div class="w-badges"><span class="w-badge vip">VIP 127</span><span class="w-badge loyal">LOYAL 123</span><span class="w-badge new">NEW 560</span></div>
+            </div>
+          </div>
+          <div class="w-sec">At risk regulars · your win back list</div>
+          <div class="w-row"><b>Carol B.</b><span class="muted">VIP · $3,363 lifetime</span><span class="w-pill">45 days away</span></div>
+          <div class="w-row"><b>Nicole F.</b><span class="muted">VIP · $2,600 lifetime</span><span class="w-pill">120 days away</span></div>
+          <div class="w-row"><b>Jae D.</b><span class="muted">VIP · $1,885 lifetime</span><span class="w-pill ok">texted today</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="story rv">
+  <div class="wrap">
+    <p>Your old POS knows everything about your customers. <em>It just refuses to tell you.</em></p>
+    <p class="fade">NailDesk turns ten years of visits into tomorrow's revenue.</p>
+  </div>
+</div>
+
+<section id="how">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <h2>Three steps to a salon that <em>runs itself</em></h2>
+      <p class="sec-sub">Built inside a working salon, tested on real Saturday rushes.</p>
+    </div>
+    <div class="steps">
+      <div class="step rv">
+        <div class="viz"><span style="font-size:44px">📥</span></div>
+        <div class="step-num">01</div>
+        <h3>Bring your customers with you</h3>
+        <p>We import your whole client list from your old system. Names, phones, visit history, spending and points. The salon we run moved 800+ clients in one afternoon.</p>
+      </div>
+      <div class="step rv" style="transition-delay:.1s">
+        <div class="viz"><span style="font-size:44px">🧾</span></div>
+        <div class="step-num">02</div>
+        <h3>Ring up visits in seconds</h3>
+        <p>Tap services, assign the tech, check out with card, cash or points. Every checkout updates the client's history, rewards and VIP status by itself.</p>
+      </div>
+      <div class="step rv" style="transition-delay:.2s">
+        <div class="viz"><span style="font-size:44px">📡</span></div>
+        <div class="step-num">03</div>
+        <h3>Watch the radar</h3>
+        <p>The dashboard shows today's money, your customer mix and the regulars who are drifting away. One text to a slipping VIP can save thousands a year.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <h2>The front desk sees today.<br>You see the <em>whole business</em>.</h2>
+      <p class="sec-sub">Same system, two views, zero spreadsheets.</p>
+    </div>
+    <div class="split">
+      <div class="pane desk rv">
+        <span class="tag">Front desk view</span>
+        <h3>Checkout without the chaos</h3>
+        <p>Big buttons for your real menu, tips and discounts built in, points redeemed with a cap you control. New girl at the desk? She learns it in ten minutes.</p>
+        <div>
+          <div class="dash-row"><span class="dash-ico">💅</span><b>Gel-X Full Set</b> + Chrome, by Lily<span class="val">$75</span></div>
+          <div class="dash-row"><span class="dash-ico">⭐</span>Redeem 100 points<span class="val">$5 off</span></div>
+          <div class="dash-row"><span class="dash-ico">✅</span>Paid card + $15 tip<span class="val">$85</span></div>
+        </div>
+      </div>
+      <div class="pane owner rv" style="transition-delay:.1s">
+        <span class="tag">Owner view</span>
+        <h3>Honest numbers, every night</h3>
+        <p>Revenue by day, by tech and by service. Who your VIPs are, who is new, and who needs a reason to come back. No more guessing from the register tape.</p>
+        <div>
+          <div class="dash-row"><span class="dash-ico">📊</span><b>This week</b>: revenue by tech, ready to screenshot</div>
+          <div class="dash-row"><span class="dash-ico">🎂</span><b>Birthdays this month</b>: 12 clients, bonus ready</div>
+          <div class="dash-row"><span class="dash-ico">⚠️</span><b>At risk</b>: 3 VIPs slipping<span class="val">win back list</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <h2>Built to keep regulars <em>regular</em></h2>
+    </div>
+    <div class="feats">
+      <div class="feat rv"><div class="ico">🧾</div><h3>Full checkout</h3><p>Tickets, tips, discounts, split payment methods and points redemption. The math is always right and the day always balances.</p></div>
+      <div class="feat rv" style="transition-delay:.05s"><div class="ico">👑</div><h3>Automatic VIP classing</h3><p>You set the rules, like VIP at 10 visits or $400 spent. NailDesk promotes clients by itself and shows you your true best customers.</p></div>
+      <div class="feat rv" style="transition-delay:.1s"><div class="ico">⭐</div><h3>Rewards engine</h3><p>Points per dollar, birthday bonuses, daily check in kiosk. Punch cards retire, and clients always know what they have earned.</p></div>
+      <div class="feat rv" style="transition-delay:.15s"><div class="ico">📇</div><h3>Customer memory</h3><p>Every visit, every note, every favorite color. "She only wants a female tech" and "nails as thin as possible" never get forgotten again.</p></div>
+      <div class="feat rv" style="transition-delay:.2s"><div class="ico">📡</div><h3>At risk radar</h3><p>VIPs who have not visited in 45 days surface automatically with their lifetime value. Your win back list writes itself every morning.</p></div>
+      <div class="feat rv" style="transition-delay:.25s"><div class="ico">📤</div><h3>Your data, always</h3><p>Import from your old POS in an afternoon, export to a spreadsheet anytime. No contracts holding your customer list hostage.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="proof">
+  <div class="wrap proof-in">
+    <div class="rv">
+      <h2>Born on the <em>salon floor</em></h2>
+      <p>NailDesk was not invented in an office. It replaced a real POS at a real California salon, importing 800+ clients with their full history in a single afternoon, and it has run the front desk every day since.</p>
+      <p>If it does not survive a Saturday rush, it does not ship.</p>
+      <div class="stat-row">
+        <div class="stat"><b>Live</b><span>running a working salon</span></div>
+        <div class="stat"><b>800+</b><span>clients imported with history</span></div>
+        <div class="stat"><b>1 tap</b><span>from ticket to paid to points</span></div>
+      </div>
+    </div>
+    <div class="rv" style="transition-delay:.15s">
+      <div class="pane" style="box-shadow:0 24px 60px rgba(30,26,22,.1)">
+        <span class="tag" style="background:var(--gold-soft);color:var(--bronze)">The full suite</span>
+        <p class="serif" style="font-size:22px;line-height:1.45;font-style:italic;color:var(--ink);margin-bottom:14px">"NailBook fills the chairs. NailMind designs the set. NailDesk rings it up and remembers everything. One family, one flow."</p>
+        <p style="font-size:13.5px;color:var(--ink3);margin:0">Pairs with <a href="https://nailbook.phaminh.com" style="color:var(--bronze);text-decoration:underline">NailBook</a> and <a href="https://nailmind.phaminh.com" style="color:var(--bronze);text-decoration:underline">NailMind</a></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="pricing">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <h2>Pricing that pays for <em>itself</em></h2>
+      <p class="sec-sub">One won back VIP covers a year. The radar finds you several every month.</p>
+    </div>
+    <div class="plans">
+      <div class="plan rv">
+        <h3>Walkthrough</h3>
+        <div class="price">$0</div>
+        <ul>
+          <li>Personal demo of the system</li>
+          <li>See it running a real salon</li>
+          <li>No commitment</li>
+        </ul>
+        <a class="btn ghost" href="mailto:nailbyminh@gmail.com?subject=NailDesk%20walkthrough">Book a walkthrough</a>
+      </div>
+      <div class="plan rv" style="transition-delay:.05s">
+        <h3>Counter</h3>
+        <div class="price">$29<small>/mo</small></div>
+        <ul>
+          <li>Checkout and tickets</li>
+          <li>Customer profiles and notes</li>
+          <li>Rewards and check in kiosk</li>
+          <li>1 location</li>
+        </ul>
+        <a class="btn ghost" href="mailto:nailbyminh@gmail.com?subject=NailDesk%20early%20access%20Counter">Get early access</a>
+      </div>
+      <div class="plan hot rv" style="transition-delay:.1s">
+        <span class="hot-tag">Most popular</span>
+        <h3>Salon</h3>
+        <div class="price">$59<small>/mo</small></div>
+        <ul>
+          <li>Everything in Counter</li>
+          <li>Import from your old POS</li>
+          <li>At risk radar and win back list</li>
+          <li>Reports by day, tech and service</li>
+          <li>Automatic VIP classing</li>
+        </ul>
+        <a class="btn gold" href="mailto:nailbyminh@gmail.com?subject=NailDesk%20early%20access%20Salon">Get early access</a>
+      </div>
+      <div class="plan rv" style="transition-delay:.15s">
+        <h3>Pro</h3>
+        <div class="price">$99<small>/mo</small></div>
+        <ul>
+          <li>Everything in Salon</li>
+          <li>Team and tech payouts</li>
+          <li>Custom domain and branding</li>
+          <li>Priority support</li>
+        </ul>
+        <a class="btn ghost" href="mailto:nailbyminh@gmail.com?subject=NailDesk%20early%20access%20Pro">Get early access</a>
+      </div>
+    </div>
+    <p class="pricing-note">Early access pricing. Lock it in now and keep it as we grow. Cancel anytime, export your data anytime.</p>
+  </div>
+</section>
+
+<section id="faq" style="padding-top:20px">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <h2>Questions, <em>answered</em></h2>
+    </div>
+    <div class="faq rv">
+      <div class="q"><button>Can I move my customers from my current POS?</button>
+        <div class="a"><p>Yes, that is the whole point. We import names, phones, visit counts, spending and points from your existing system's export. The salon we run brought over 800+ clients with full history in one afternoon.</p></div></div>
+      <div class="q"><button>Is it hard to learn for my front desk?</button>
+        <div class="a"><p>No. Checkout is tap the services, tap the tech, tap pay. Most people learn it in ten minutes, and there is nothing to install or update.</p></div></div>
+      <div class="q"><button>How does the rewards system work?</button>
+        <div class="a"><p>You set the rules once: points per dollar, what a point is worth, birthday bonus, and what makes a VIP. NailDesk does all the math at checkout and clients can check in daily at the kiosk for bonus points.</p></div></div>
+      <div class="q"><button>What is the at risk radar?</button>
+        <div class="a"><p>NailDesk watches for good customers who stopped coming. If a VIP has not visited in 45 days, she appears on your list with her lifetime value, so a quick text can bring her back before she finds a new salon.</p></div></div>
+      <div class="q"><button>Do I need NailBook too?</button>
+        <div class="a"><p>They work best together, but no. NailDesk runs your counter and customers on its own. Add NailBook when you want clients booking themselves online, and NailMind when you want AI design.</p></div></div>
+      <div class="q"><button>Is my data really mine?</button>
+        <div class="a"><p>Yes. Your clients, your numbers, your history. Export everything to a spreadsheet anytime, and if you ever leave, it all leaves with you.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<div class="final">
+  <div class="wrap rv">
+    <h2>Stop guessing. Start <em style="color:var(--gold)">knowing</em>.</h2>
+    <p class="sub">NailDesk remembers every client so you can keep every client.</p>
+    <a class="btn big gold" href="mailto:nailbyminh@gmail.com?subject=NailDesk%20early%20access">Get early access</a>
+  </div>
+</div>
+
+<footer>
+  <div class="wrap foot-in">
+    <span class="logo">Nail<em>desk</em></span>
+    <div class="foot-links">
+      <a href="https://nailbook.phaminh.com">NailBook</a>
+      <a href="https://nailmind.phaminh.com">NailMind</a>
+      <a href="mailto:nailbyminh@gmail.com?subject=NailDesk%20support">Support</a>
+      <a href="#" onclick="alert('Privacy policy coming with early access launch.');return false">Privacy</a>
+      <a href="#" onclick="alert('Terms coming with early access launch.');return false">Terms</a>
+    </div>
+    <span>© 2026 NailDesk</span>
+  </div>
+</footer>
+
+<script>
+const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: .12 });
+document.querySelectorAll('.rv').forEach(el => io.observe(el));
+document.querySelectorAll('.q button').forEach(b => b.onclick = () => {
+  const q = b.parentElement;
+  const was = q.classList.contains('open');
+  document.querySelectorAll('.q').forEach(x => x.classList.remove('open'));
+  if (!was) q.classList.add('open');
+});
+</script>
+</body>
+</html>

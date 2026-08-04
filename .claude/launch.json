@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "nail-pos",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["server.js"],
+      "port": 3789
+    },
+    {
+      "name": "dream-nails-cloud",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["cloud/server.js"],
+      "port": 3000
+    }
+  ]
+}

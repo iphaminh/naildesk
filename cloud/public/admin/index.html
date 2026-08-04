@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dream Nails POS · Admin</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">💅 <span id="salonName">Nail POS</span></div>
+    <nav id="nav">
+      <a href="#dashboard" data-page="dashboard" class="active">📊 Dashboard</a>
+      <a href="#appointments" data-page="appointments">📅 Appointments</a>
+      <a href="#checkin" data-page="checkin">🛎️ Check-In / Sale</a>
+      <a href="#customers" data-page="customers">👥 Customers</a>
+      <a href="#services" data-page="services">💰 Services</a>
+      <a href="#techs" data-page="techs">🧑‍🎨 Techs</a>
+      <a href="#nailmind" data-page="nailmind">💎 NailMind</a>
+      <a href="#reports" data-page="reports">📈 Reports</a>
+      <a href="#import" data-page="import">📥 Import</a>
+      <a href="#settings" data-page="settings">⚙️ Settings</a>
+    </nav>
+    <div class="sidebar-foot">
+      Client pages:<br>
+      <a class="foot-link" href="/" target="_blank">Booking page ↗</a><br>
+      <a class="foot-link" href="/kiosk" target="_blank">Check-in kiosk ↗</a><br>
+      <a class="foot-link" href="/nailmind" target="_blank">NailMind studio ↗</a>
+      <div style="margin-top:10px"><a class="foot-link" href="#" id="lockBtn">🔒 Lock</a></div>
+    </div>
+  </aside>
+  <main id="main"></main>
+</div>
+<div id="modal-root"></div>
+<div id="toast"></div>
+<div id="lock" class="lock hidden">
+  <div class="lock-card">
+    <div style="font-size:2rem">💅</div>
+    <h3>Dream Nails POS</h3>
+    <p class="muted">Enter the owner PIN</p>
+    <input id="pinInput" type="password" inputmode="numeric" maxlength="8" autocomplete="off">
+    <button class="primary" id="pinBtn">Unlock</button>
+    <div class="muted" id="pinMsg" style="min-height:18px;margin-top:8px"></div>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

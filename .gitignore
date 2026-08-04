@@ -1,0 +1,8 @@
+node_modules/
+data/
+*.log
+.DS_Store
+.mcp.json
+.claude/settings.local.json
+nohup.out
+*.tar.gz

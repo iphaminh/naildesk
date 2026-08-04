@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Dream Nails &amp; Spa · Book an Appointment</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+:root {
+  --bg:#fff; --bg2:#f7f5f2; --border:#e4e0da; --border2:#ccc8c2;
+  --text:#1a1a1a; --text2:#666; --text3:#999;
+  --gold:#c9a87c; --gold-bg:#faf7f2; --radius:10px;
+}
+body { font-family:'Jost',sans-serif; background:#f0ece6; min-height:100vh; display:flex; justify-content:center; align-items:flex-start; padding:20px 0 40px; }
+.phone { background:var(--bg); width:100%; max-width:420px; border-radius:24px; overflow:hidden; box-shadow:0 8px 40px rgba(0,0,0,0.12); min-height:100vh; display:flex; flex-direction:column; }
+@media(min-width:460px){ .phone{min-height:auto;} body{align-items:center;padding:40px 20px;} }
+.screen { display:none; flex-direction:column; flex:1; }
+.screen.on { display:flex; }
+.hdr { background:#111; padding:1.5rem 1.25rem 0; color:#f5f0ea; flex-shrink:0; }
+.hdr.pad-b { padding-bottom:1.1rem; }
+.brand { font-family:'Cormorant Garamond',serif; font-size:26px; font-weight:500; color:#f5f0ea; }
+.brand em { color:var(--gold); font-style:normal; }
+.tagline { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:#888; margin-top:2px; }
+.tabs { display:flex; margin-top:1rem; border-bottom:0.5px solid #333; }
+.tab { font-size:11px; letter-spacing:1px; text-transform:uppercase; color:#666; padding:10px 16px; cursor:pointer; border-bottom:2px solid transparent; transition:all 0.2s; user-select:none; }
+.tab.act { color:var(--gold); border-bottom-color:var(--gold); }
+.body { flex:1; padding:1.25rem; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+.cat { font-size:9px; letter-spacing:2px; text-transform:uppercase; color:var(--text3); margin:1.25rem 0 8px; }
+.cat:first-child { margin-top:0; }
+.svc { display:flex; justify-content:space-between; align-items:flex-start; padding:11px 13px; border:0.5px solid var(--border); border-radius:var(--radius); margin-bottom:6px; cursor:pointer; transition:all 0.15s; background:var(--bg); }
+.svc:hover,.svc.sel { border-color:var(--gold); background:var(--gold-bg); }
+.svc.sel .chk { opacity:1; }
+.svc-name { font-size:13px; font-weight:500; color:var(--text); }
+.svc-desc { font-size:11px; color:var(--text3); margin-top:3px; line-height:1.4; max-width:210px; }
+.svc-right { display:flex; flex-direction:column; align-items:flex-end; gap:5px; flex-shrink:0; padding-left:8px; }
+.price { font-size:14px; font-weight:500; color:var(--gold); font-family:'Cormorant Garamond',serif; }
+.chk { width:18px; height:18px; border-radius:50%; background:var(--gold); display:flex; align-items:center; justify-content:center; font-size:10px; color:#111; opacity:0; transition:opacity 0.15s; }
+.addon-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; margin-bottom:6px; }
+.chip { border:0.5px solid var(--border); border-radius:var(--radius); padding:9px 11px; cursor:pointer; transition:all 0.15s; background:var(--bg); }
+.chip:hover,.chip.sel { border-color:var(--gold); background:var(--gold-bg); }
+.chip-name { font-size:12px; font-weight:500; color:var(--text); }
+.chip-price { font-size:11px; color:var(--gold); margin-top:2px; }
+.art-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:10px; }
+.art-card { border:0.5px solid var(--border); border-radius:var(--radius); overflow:hidden; cursor:pointer; transition:all 0.15s; }
+.art-card:hover,.art-card.sel { border-color:var(--gold); border-width:1.5px; }
+.art-thumb { height:80px; display:flex; align-items:center; justify-content:center; }
+.art-label { padding:8px 10px; background:var(--bg); }
+.art-title { font-size:12px; font-weight:500; color:var(--text); }
+.art-price { font-size:11px; color:var(--gold); margin-top:1px; }
+.upload-z { border:0.5px dashed var(--border2); border-radius:var(--radius); padding:1.25rem; text-align:center; cursor:pointer; margin-bottom:14px; transition:border 0.15s; }
+.upload-z:hover { border-color:var(--gold); }
+.upload-z p { font-size:12px; color:var(--text2); }
+.upload-z span { font-size:11px; color:var(--text3); display:block; margin-top:3px; }
+.upload-preview { width:100%; height:100px; object-fit:cover; border-radius:var(--radius); margin-bottom:10px; display:none; }
+.month-nav { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.month-label { font-family:'Cormorant Garamond',serif; font-size:16px; font-weight:500; color:var(--text); }
+.month-btn { background:none; border:0.5px solid var(--border); border-radius:6px; width:28px; height:28px; cursor:pointer; font-size:14px; color:var(--text2); display:flex; align-items:center; justify-content:center; }
+.month-btn:hover { border-color:var(--gold); color:var(--gold); }
+.cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:14px; }
+.cal-day-label { font-size:10px; text-align:center; color:var(--text3); padding:4px 0; }
+.cal-day { aspect-ratio:1; border-radius:50%; border:none; background:transparent; font-size:13px; cursor:pointer; color:var(--text); transition:all 0.15s; display:flex; align-items:center; justify-content:center; font-family:'Jost',sans-serif; }
+.cal-day:hover { background:var(--bg2); }
+.cal-day.sel { background:var(--gold); color:#111; font-weight:500; }
+.cal-day.past,.cal-day.off { color:var(--text3); cursor:default; }
+.cal-day.past:hover,.cal-day.off:hover { background:transparent; }
+.tech-row { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
+.tech-pill { border:0.5px solid var(--border); border-radius:999px; padding:8px 14px; font-size:12px; cursor:pointer; transition:all 0.15s; background:var(--bg); color:var(--text); user-select:none; }
+.tech-pill:hover { border-color:var(--gold); }
+.tech-pill.sel { border-color:var(--gold); background:var(--gold-bg); font-weight:500; }
+.time-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-bottom:16px; }
+.t-btn { border:0.5px solid var(--border); border-radius:var(--radius); padding:10px 4px; font-size:12px; text-align:center; cursor:pointer; transition:all 0.15s; background:var(--bg); color:var(--text); font-family:'Jost',sans-serif; }
+.t-btn:hover { border-color:var(--gold); background:var(--gold-bg); }
+.t-btn.sel { border-color:var(--gold); background:var(--gold-bg); font-weight:500; }
+.t-btn.full { color:var(--text3); text-decoration:line-through; cursor:default; }
+.t-btn.full:hover { border-color:var(--border); background:var(--bg); }
+label.lbl { font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--text3); display:block; margin-bottom:5px; }
+input.inp,textarea.inp { width:100%; border:0.5px solid var(--border); border-radius:var(--radius); padding:11px 13px; font-size:13px; font-family:'Jost',sans-serif; background:var(--bg); color:var(--text); outline:none; margin-bottom:14px; transition:border 0.15s; -webkit-appearance:none; }
+input.inp:focus,textarea.inp:focus { border-color:var(--gold); }
+textarea.inp { resize:none; height:80px; }
+.sms-consent { display:flex; gap:9px; align-items:flex-start; background:var(--bg2); border-radius:var(--radius); padding:11px 12px; margin:-6px 0 14px 0; cursor:pointer; }
+.sms-consent input[type="checkbox"] { margin-top:2px; width:16px; height:16px; accent-color:var(--gold); flex-shrink:0; cursor:pointer; }
+.sms-consent span { font-size:11.5px; color:var(--text2); line-height:1.5; }
+.sum-box { background:var(--bg2); border-radius:var(--radius); padding:13px 14px; margin-bottom:14px; }
+.sum-box-title { font-size:12px; font-weight:500; color:var(--text); margin-bottom:8px; }
+.sum-row { display:flex; justify-content:space-between; font-size:13px; padding:7px 0; border-bottom:0.5px solid var(--border); color:var(--text); }
+.sum-row:last-child { border-bottom:none; font-weight:500; }
+.sum-lbl { color:var(--text2); }
+.btn { width:100%; background:#111; color:#f5f0ea; border:none; border-radius:var(--radius); padding:14px; font-size:13px; font-weight:500; cursor:pointer; font-family:'Jost',sans-serif; letter-spacing:0.5px; transition:opacity 0.15s; -webkit-appearance:none; }
+.btn:hover { opacity:0.85; }
+.btn:active { transform:scale(0.98); }
+.btn:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
+.btn-wrap { padding:0 1.25rem 1.25rem; }
+.ftr { display:flex; justify-content:space-between; align-items:center; padding:11px 1.25rem; border-top:0.5px solid var(--border); flex-shrink:0; }
+.bk,.nxt { font-size:12px; letter-spacing:0.5px; cursor:pointer; background:none; border:none; font-family:'Jost',sans-serif; }
+.bk { color:var(--text2); }
+.nxt { color:var(--gold); font-weight:500; }
+.dots { display:flex; gap:5px; align-items:center; }
+.dot { width:5px; height:5px; border-radius:50%; background:var(--border2); }
+.dot.on { background:var(--gold); }
+.confirm-ring { width:60px; height:60px; border-radius:50%; border:1.5px solid var(--gold); display:flex; align-items:center; justify-content:center; margin:0 auto 1rem; font-size:22px; color:var(--gold); }
+.deal { border:0.5px solid var(--border); border-radius:var(--radius); padding:13px 14px; margin-bottom:8px; }
+.deal.hot { border-color:var(--gold); background:var(--gold-bg); }
+.deal-tag { font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--gold); margin-bottom:4px; }
+.deal-name { font-size:15px; font-weight:500; color:var(--text); margin-bottom:3px; font-family:'Cormorant Garamond',serif; }
+.deal-note { font-size:11px; color:var(--text2); }
+.hint { background:var(--bg2); border-radius:var(--radius); padding:12px 14px; font-size:12px; color:var(--text2); line-height:1.5; margin-bottom:14px; }
+.error-msg { background:#fef2f2; border:0.5px solid #fca5a5; border-radius:var(--radius); padding:10px 13px; font-size:12px; color:#dc2626; margin-bottom:12px; display:none; }
+.spinner { display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,0.3); border-top-color:#fff; border-radius:50%; animation:spin 0.7s linear infinite; margin-right:6px; vertical-align:middle; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.note-line { font-size:11px; color:var(--text3); margin:2px 0 14px; }
+.center { text-align:center; }
+</style>
+</head>
+<body>
+<div class="phone">
+
+  <!-- STEP 1: HOME / SERVICES -->
+  <div class="screen on" id="s-home">
+    <div class="hdr">
+      <div class="brand">Dream Nails <em>&amp; Spa</em></div>
+      <div class="tagline">Vacaville · Book your visit</div>
+      <div class="tabs">
+        <div class="tab act" id="tab-book" onclick="switchTab('book')">Book</div>
+        <div class="tab" id="tab-deals" onclick="switchTab('deals')">Deals</div>
+      </div>
+    </div>
+    <div class="body" id="tab-book-body">
+      <div id="svcList"><div class="hint">Loading the menu...</div></div>
+    </div>
+    <div class="body" id="tab-deals-body" style="display:none">
+      <div class="deal hot">
+        <div class="deal-tag">Rewards</div>
+        <div class="deal-name">Earn points every visit</div>
+        <div class="deal-note">Every $1 you spend is 1 point. 100 points is $5 off your service.</div>
+      </div>
+      <div class="deal">
+        <div class="deal-tag">Birthday month</div>
+        <div class="deal-name">50 bonus points</div>
+        <div class="deal-note">Tell us your birthday at the front desk kiosk and we treat you in your birthday month.</div>
+      </div>
+      <div class="deal">
+        <div class="deal-tag">Daily check in</div>
+        <div class="deal-name">10 points at the kiosk</div>
+        <div class="deal-note">Check in with your phone number at the salon, once a day, and watch your points grow.</div>
+      </div>
+    </div>
+    <div class="btn-wrap" id="continueWrap" style="display:none">
+      <button class="btn" onclick="goStep(2)">Continue →</button>
+    </div>
+  </div>
+
+  <!-- STEP 2: INSPO -->
+  <div class="screen" id="s-inspo">
+    <div class="hdr pad-b">
+      <div class="brand">Dream Nails <em>&amp; Spa</em></div>
+      <div class="tagline">Share your inspo</div>
+    </div>
+    <div class="body">
+      <div class="cat">Pick a style or upload your own</div>
+      <div class="art-grid">
+        <div class="art-card" onclick="pickStyle(this,'Chrome silver')">
+          <div class="art-thumb" style="background:#e8e8ec"><div style="width:34px;height:44px;border-radius:50% 50% 45% 45%;background:linear-gradient(135deg,#c8c8d0,#9a9aa6 60%,#d8d8e0)"></div></div>
+          <div class="art-label"><div class="art-title">Chrome silver</div><div class="art-price">+$10</div></div>
+        </div>
+        <div class="art-card" onclick="pickStyle(this,'French tips')">
+          <div class="art-thumb" style="background:#f7f2ea"><div style="width:34px;height:44px;border-radius:50% 50% 45% 45%;background:linear-gradient(to bottom,#fff 0 26%,#f3e0cd 26%)"></div></div>
+          <div class="art-label"><div class="art-title">French tips</div><div class="art-price">+$8</div></div>
+        </div>
+        <div class="art-card" onclick="pickStyle(this,'Cat-eye')">
+          <div class="art-thumb" style="background:#2a0f16"><div style="width:34px;height:44px;border-radius:50% 50% 45% 45%;background:radial-gradient(ellipse at 50% 35%, #b04355 0 18%, #571623 60%)"></div></div>
+          <div class="art-label"><div class="art-title">Cat-eye</div><div class="art-price">+$10</div></div>
+        </div>
+        <div class="art-card" onclick="document.getElementById('photoInput').click()">
+          <div class="art-thumb" style="background:var(--bg2)"><div style="width:28px;height:28px;border:1px solid var(--border2);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--text3)">+</div></div>
+          <div class="art-label"><div class="art-title">Upload your own</div><div class="art-price" style="color:var(--text3)">photo / screenshot</div></div>
+        </div>
+      </div>
+      <img id="photoPreview" class="upload-preview" alt="Your inspo photo">
+      <div class="upload-z" onclick="document.getElementById('photoInput').click()">
+        <p id="uploadText">Or tap here to upload a photo</p>
+        <span>Instagram screenshot, Pinterest, anything works</span>
+      </div>
+      <input type="file" id="photoInput" accept="image/*" style="display:none">
+      <label class="lbl">Notes for your tech (optional)</label>
+      <textarea class="inp" id="notes" placeholder="Shape, length, color ideas, special requests..."></textarea>
+    </div>
+    <div class="ftr">
+      <button class="bk" onclick="goStep(1)">← Back</button>
+      <div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot"></div><div class="dot"></div></div>
+      <button class="nxt" onclick="goStep(3)">Next →</button>
+    </div>
+  </div>
+
+  <!-- STEP 3: DATE & TIME -->
+  <div class="screen" id="s-date">
+    <div class="hdr pad-b">
+      <div class="brand">Dream Nails <em>&amp; Spa</em></div>
+      <div class="tagline">Pick your date &amp; time</div>
+    </div>
+    <div class="body">
+      <div class="error-msg" id="dateErr"></div>
+      <div class="cat">Your nail artist</div>
+      <div class="tech-row" id="techArea"><div class="hint">Loading artists...</div></div>
+      <div class="cat">Select a date</div>
+      <div class="month-nav">
+        <button class="month-btn" onclick="moveMonth(-1)">‹</button>
+        <div class="month-label" id="monthLabel"></div>
+        <button class="month-btn" onclick="moveMonth(1)">›</button>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div class="cat">Available times</div>
+      <div id="timeArea"><div class="hint">Pick a date above to see open times.</div></div>
+      <div class="note-line">Strikethrough = fully booked.</div>
+    </div>
+    <div class="ftr">
+      <button class="bk" onclick="goStep(2)">← Back</button>
+      <div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div><div class="dot"></div></div>
+      <button class="nxt" onclick="goStep(4)">Next →</button>
+    </div>
+  </div>
+
+  <!-- STEP 4: CONTACT + CONFIRM -->
+  <div class="screen" id="s-contact">
+    <div class="hdr pad-b">
+      <div class="brand">Dream Nails <em>&amp; Spa</em></div>
+      <div class="tagline">Almost done</div>
+    </div>
+    <div class="body">
+      <div class="error-msg" id="bookErr"></div>
+      <label class="lbl">Your name</label>
+      <input class="inp" id="cName" autocomplete="name" placeholder="First name is fine">
+      <label class="lbl">Phone</label>
+      <input class="inp" id="cPhone" type="tel" autocomplete="tel" placeholder="707 555 1234">
+      <label class="lbl">Email (optional)</label>
+      <input class="inp" id="cEmail" type="email" autocomplete="email" placeholder="you@email.com">
+      <label class="sms-consent">
+        <input type="checkbox" id="cSms">
+        <span>Yes, text me appointment confirmations and reminders about my visits. Message and data rates may apply. Reply STOP to opt out anytime.</span>
+      </label>
+      <div class="sum-box">
+        <div class="sum-box-title">Your appointment</div>
+        <div id="sumRows"></div>
+      </div>
+      <button class="btn" id="confirmBtn" onclick="submitBooking()">Confirm booking</button>
+    </div>
+    <div class="ftr">
+      <button class="bk" onclick="goStep(3)">← Back</button>
+      <div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div></div>
+      <span style="width:52px"></span>
+    </div>
+  </div>
+
+  <!-- CONFIRMED -->
+  <div class="screen" id="s-done">
+    <div class="hdr pad-b">
+      <div class="brand">Dream Nails <em>&amp; Spa</em></div>
+      <div class="tagline">Booking confirmed</div>
+    </div>
+    <div class="body center" style="padding-top:2.2rem">
+      <div class="confirm-ring">✓</div>
+      <div style="font-family:'Cormorant Garamond',serif;font-size:22px;margin-bottom:6px" id="doneTitle">You are booked!</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.6" id="doneText"></div>
+      <div class="hint" style="margin-top:1.25rem;text-align:left">
+        Members earn 1 point for every $1 spent. 100 points is $5 off. Check in at the kiosk when you arrive to collect your daily bonus.
+      </div>
+      <button class="btn" style="margin-top:6px" onclick="location.reload()">Book another visit</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const state = { service:null, serviceId:null, price:0, addons:[], inspo:null, photoData:null, notes:'', date:null, time:null, techId:0, techName:null };
+let calCursor = new Date(); calCursor.setDate(1);
+const todayStr = new Date().toLocaleDateString('sv-SE');
+
+function switchTab(t) {
+  $('tab-book').classList.toggle('act', t==='book');
+  $('tab-deals').classList.toggle('act', t==='deals');
+  $('tab-book-body').style.display = t==='book' ? '' : 'none';
+  $('tab-deals-body').style.display = t==='deals' ? '' : 'none';
+  $('continueWrap').style.display = (t==='book' && state.service) ? '' : 'none';
+}
+
+function goStep(n) {
+  const ids = ['s-home','s-inspo','s-date','s-contact','s-done'];
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $(ids[n-1]).classList.add('on');
+  if (n===3) { renderCal(); loadTechs(); }
+  if (n===4) renderSummary();
+  window.scrollTo(0,0);
+}
+
+/* ---- step 1: services ---- */
+async function loadServices() {
+  try {
+    const r = await fetch('/api/public/services');
+    const list = await r.json();
+    const order = ['Pedicures','Manicures','Dipping Powder','Artificial Nails','Kids','Waxing','Add-ons'];
+    const byCat = {};
+    for (const s of list) (byCat[s.category] = byCat[s.category] || []).push(s);
+    const cats = [...order.filter(c=>byCat[c]), ...Object.keys(byCat).filter(c=>!order.includes(c))];
+    $('svcList').innerHTML = cats.map(cat => {
+      if (cat === 'Add-ons') {
+        return `<div class="cat">Add-ons · pick any</div><div class="addon-grid">` +
+          byCat[cat].map(s => `<div class="chip" onclick='toggleAddon(this,${JSON.stringify(s.name)},${s.price})'>
+            <div class="chip-name">${s.name}</div><div class="chip-price">$${Number(s.price).toFixed(0)}</div></div>`).join('') + `</div>`;
+      }
+      return `<div class="cat">${cat}</div>` + byCat[cat].map(s => `
+        <div class="svc" onclick='pick(this,${s.id},${JSON.stringify(s.name)},${s.price})'>
+          <div><div class="svc-name">${s.name}</div>${s.description?`<div class="svc-desc">${s.description}</div>`:''}</div>
+          <div class="svc-right"><div class="price">$${Number(s.price).toFixed(0)}</div><div class="chk">✓</div></div>
+        </div>`).join('');
+    }).join('');
+  } catch { $('svcList').innerHTML = '<div class="error-msg" style="display:block">Could not load the menu. Please refresh.</div>'; }
+}
+function pick(el, id, name, price) {
+  document.querySelectorAll('.svc').forEach(x=>x.classList.remove('sel'));
+  el.classList.add('sel');
+  state.service = name; state.serviceId = Number(id) || null; state.price = Number(price);
+  state.techId = 0; state.techName = null; // new service may need a different artist
+  $('continueWrap').style.display = '';
+}
+
+/* ---- artists qualified for the picked service ---- */
+function escHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+async function loadTechs() {
+  const area = $('techArea');
+  try {
+    const r = await fetch('/api/public/techs' + (state.serviceId ? '?service_id=' + state.serviceId : ''));
+    const techs = await r.json();
+    if (!techs.find(t => t.id === state.techId)) { state.techId = 0; state.techName = null; }
+    const pill = (id, name, label) =>
+      `<span class="tech-pill${state.techId === id ? ' sel' : ''}" data-tid="${id}" data-tname="${escHtml(name)}">${escHtml(label)}</span>`;
+    area.innerHTML = pill(0, '', 'First available') + techs.map(t => pill(t.id, t.name, t.name)).join('');
+    area.querySelectorAll('.tech-pill').forEach(p => p.onclick = () => {
+      area.querySelectorAll('.tech-pill').forEach(x => x.classList.remove('sel'));
+      p.classList.add('sel');
+      state.techId = Number(p.dataset.tid) || 0;
+      state.techName = state.techId ? p.dataset.tname : null;
+      if (state.date) { state.time = null; pickDate(state.date); } // this artist's openings differ
+    });
+  } catch { area.innerHTML = '<span class="tech-pill sel">First available</span>'; }
+}
+function toggleAddon(el, name, price) {
+  el.classList.toggle('sel');
+  const i = state.addons.findIndex(a=>a.name===name);
+  if (i>=0) state.addons.splice(i,1); else state.addons.push({name, price:Number(price)});
+}
+
+/* ---- step 2: inspo ---- */
+function pickStyle(el, name) {
+  const was = el.classList.contains('sel');
+  document.querySelectorAll('.art-card').forEach(x=>x.classList.remove('sel'));
+  if (!was) { el.classList.add('sel'); state.inspo = name; } else state.inspo = null;
+}
+$('photoInput').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  compressImage(f).then(dataUrl => {
+    state.photoData = dataUrl;
+    $('photoPreview').src = dataUrl;
+    $('photoPreview').style.display = 'block';
+    $('uploadText').textContent = 'Photo added! Tap to change it';
+  }).catch(()=>{ $('uploadText').textContent = 'That photo did not work, try another'; });
+});
+function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const max = 1000;
+      let w = img.width, h = img.height;
+      if (w > max || h > max) { const k = Math.min(max/w, max/h); w = Math.round(w*k); h = Math.round(h*k); }
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+/* ---- step 3: calendar + times ---- */
+function renderCal() {
+  const y = calCursor.getFullYear(), m = calCursor.getMonth();
+  $('monthLabel').textContent = calCursor.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  const first = new Date(y,m,1).getDay();
+  const days = new Date(y,m+1,0).getDate();
+  let html = ['Su','Mo','Tu','We','Th','Fr','Sa'].map(d=>`<div class="cal-day-label">${d}</div>`).join('');
+  for (let i=0;i<first;i++) html += '<div></div>';
+  for (let d=1;d<=days;d++) {
+    const iso = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const past = iso < todayStr;
+    const sel = state.date === iso;
+    html += `<button class="cal-day${past?' past':''}${sel?' sel':''}" ${past?'':`onclick="pickDate('${iso}')"`}>${d}</button>`;
+  }
+  $('calGrid').innerHTML = html;
+}
+function moveMonth(dir) {
+  calCursor.setMonth(calCursor.getMonth()+dir);
+  const now = new Date(); now.setDate(1); now.setHours(0,0,0,0);
+  if (calCursor < now) calCursor = new Date(now);
+  renderCal();
+}
+async function pickDate(iso) {
+  state.date = iso; state.time = null;
+  renderCal();
+  $('timeArea').innerHTML = '<div class="hint">Checking open times...</div>';
+  try {
+    const r = await fetch('/api/public/slots?date='+iso+(state.techId?'&tech_id='+state.techId:''));
+    const d = await r.json();
+    if (d.closed) { $('timeArea').innerHTML = '<div class="hint">We are closed that day. Please pick another date.</div>'; return; }
+    $('timeArea').innerHTML = '<div class="time-grid">' + d.slots.map(s =>
+      `<button class="t-btn${s.available?'':' full'}" ${s.available?`onclick="pickTime(this,'${s.time}')"`:''}>${s.time}</button>`).join('') + '</div>';
+  } catch { $('timeArea').innerHTML = '<div class="error-msg" style="display:block">Could not load times. Try again.</div>'; }
+}
+function pickTime(el, t) {
+  document.querySelectorAll('.t-btn').forEach(x=>x.classList.remove('sel'));
+  el.classList.add('sel');
+  state.time = t;
+}
+
+/* ---- step 4: summary + submit ---- */
+function prettyDate(iso) {
+  return new Date(iso+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+}
+function renderSummary() {
+  const rows = [];
+  rows.push(['Service', state.service ? `${state.service} · $${state.price.toFixed(0)}` : 'Not picked yet']);
+  if (state.addons.length) rows.push(['Add-ons', state.addons.map(a=>a.name).join(', ')]);
+  if (state.inspo) rows.push(['Style', state.inspo]);
+  if (state.photoData) rows.push(['Inspo photo', 'Attached ✓']);
+  rows.push(['Artist', state.techName || 'First available']);
+  rows.push(['When', state.date && state.time ? `${prettyDate(state.date)} at ${state.time}` : 'Not picked yet']);
+  $('sumRows').innerHTML = rows.map(([l,v])=>`<div class="sum-row"><span class="sum-lbl">${l}</span><span style="text-align:right;max-width:60%">${v}</span></div>`).join('');
+}
+async function submitBooking() {
+  const err = $('bookErr'); err.style.display = 'none';
+  const name = $('cName').value.trim(), phone = $('cPhone').value.trim();
+  if (!state.service) { err.textContent='Please go back and pick a service.'; err.style.display='block'; return; }
+  if (!state.date || !state.time) { err.textContent='Please go back and pick a date and time.'; err.style.display='block'; return; }
+  if (!name || !phone) { err.textContent='Please enter your name and phone number.'; err.style.display='block'; return; }
+  const btn = $('confirmBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Booking...';
+  try {
+    const r = await fetch('/api/public/book', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        clientName: name, clientPhone: phone, clientEmail: $('cEmail').value.trim(),
+        service: `${state.service} · $${state.price.toFixed(0)}`,
+        serviceId: state.serviceId,
+        techId: state.techId || null,
+        addons: state.addons.map(a=>a.name).join(', '),
+        inspoStyle: state.inspo,
+        photoData: state.photoData,
+        notes: $('notes').value.trim(),
+        bookingDate: state.date, bookingTime: state.time,
+        smsConsent: $('cSms').checked
+      })
+    });
+    const d = await r.json();
+    if (!r.ok) { const e2 = new Error(d.message || d.error || 'Something went wrong'); e2.code = d.error; throw e2; }
+    $('doneText').textContent = `${state.service}${state.techName ? ' with ' + state.techName : ''} on ${prettyDate(state.date)} at ${state.time}. We saved your spot, ${name.split(' ')[0]}. See you soon!`;
+    goStep(5);
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = 'Confirm booking';
+    if (e.code === 'SLOT_TAKEN' || e.code === 'TECH_TAKEN') {
+      goStep(3);
+      const de = $('dateErr');
+      de.textContent = e.message || 'Sorry, that time just filled up. Please pick another.';
+      de.style.display = 'block';
+      pickDate(state.date);
+    } else {
+      err.textContent = e.message; err.style.display = 'block';
+    }
+  }
+}
+
+loadServices();
+
+/* NailMind handoff: carry the designed look (notes + generated image) into this booking */
+try {
+  const nm = localStorage.getItem('nm_note');
+  if (nm) {
+    $('notes').value = nm;
+    localStorage.removeItem('nm_note');
+  }
+  const nmp = localStorage.getItem('nm_photo');
+  if (nmp) {
+    state.photoData = nmp;
+    $('photoPreview').src = nmp;
+    $('photoPreview').style.display = 'block';
+    $('uploadText').textContent = 'Your NailMind design is attached! Tap to change it';
+    localStorage.removeItem('nm_photo');
+  }
+} catch (e) {}
+</script>
+</body>
+</html>

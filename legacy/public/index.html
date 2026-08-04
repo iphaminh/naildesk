@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nail POS</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">💅 <span id="salonName">Nail POS</span></div>
+    <nav id="nav">
+      <a href="#dashboard" data-page="dashboard" class="active">📊 Dashboard</a>
+      <a href="#checkin" data-page="checkin">🛎️ Check-In / Sale</a>
+      <a href="#customers" data-page="customers">👥 Customers</a>
+      <a href="#services" data-page="services">💰 Services</a>
+      <a href="#techs" data-page="techs">🧑‍🎨 Techs</a>
+      <a href="#reports" data-page="reports">📈 Reports</a>
+      <a href="#import" data-page="import">📥 Import</a>
+      <a href="#settings" data-page="settings">⚙️ Settings</a>
+    </nav>
+    <div class="sidebar-foot">Your data lives in <code>data/salon.db</code></div>
+  </aside>
+  <main id="main"></main>
+</div>
+<div id="modal-root"></div>
+<div id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>
