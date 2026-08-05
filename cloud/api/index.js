@@ -592,6 +592,58 @@ app.get('/api/nailmind/accounts/:id/ledger', requirePin, wrap(async (req, res) =
 // trusted: the session is re-fetched from Stripe with the salon's own key,
 // the pack must match a configured pack (credits AND price), and the
 // nailmind_stripe_events primary key makes crediting once-per-session.
+// Everything Stripe can sell, in one table — checkout creates sessions from it
+// and the webhook validates against it, so pack/price/credits can't drift apart.
+function nmStripePacks(s) {
+  return {
+    starter: { price_id: (s.stripe_price_starter || '').trim(), credits: Number(s.nailmind_starter_credits || 8), cents: Math.round(Number(s.nailmind_starter_price || 2.99) * 100) },
+    pack10: { price_id: (s.stripe_price_10 || '').trim(), credits: 10, cents: 499 },
+    pack25: { price_id: (s.stripe_price_25 || '').trim(), credits: 25, cents: 999 },
+    pack60: { price_id: (s.stripe_price_60 || '').trim(), credits: 60, cents: 1999 },
+  };
+}
+
+// Signed-in checkout: the server creates the Stripe Checkout Session, so the
+// pack, amount and phone can never be tampered with client-side. Stripe's
+// hosted page shows Apple Pay / Google Pay automatically.
+app.post('/api/public/nailmind/checkout', wrap(async (req, res) => {
+  const s = await getSettings();
+  const sk = (s.stripe_secret_key || '').trim();
+  if (!sk) return res.status(503).json({ error: 'Online checkout is coming soon — credits are available at the front desk.' });
+  const { phone, token, pack } = req.body || {};
+  const acct = await nmAuthed(phone, token);
+  if (!acct) return res.status(401).json({ error: 'Sign in first to buy credits.' });
+  const chosen = nmStripePacks(s)[String(pack)];
+  if (!chosen || !chosen.price_id) return res.status(400).json({ error: 'Pick a credit pack.' });
+  if (pack === 'starter' && !(await nmStarter(acct, s))) {
+    return res.status(400).json({ error: 'The first-pack deal is no longer available on this account.' });
+  }
+  const form = new URLSearchParams({
+    mode: 'payment',
+    'line_items[0][price]': chosen.price_id,
+    'line_items[0][quantity]': '1',
+    success_url: 'https://nailmind.app/app?paid=1',
+    cancel_url: 'https://nailmind.app/app?paid=0',
+    'metadata[phone]': acct.phone,
+    'metadata[credits]': String(chosen.credits),
+    'metadata[pack]': String(pack),
+  });
+  const r = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+    method: 'POST',
+    headers: {
+      Authorization: 'Basic ' + Buffer.from(sk + ':').toString('base64'),
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: form.toString()
+  });
+  const sess = await r.json();
+  if (!r.ok || !sess.url) {
+    console.error('Stripe session create failed:', sess.error && sess.error.message);
+    return res.status(502).json({ error: 'Could not start checkout — try again in a moment.' });
+  }
+  res.json({ url: sess.url });
+}));
+
 app.post('/api/public/nailmind/stripe-webhook', wrap(async (req, res) => {
   const s = await getSettings();
   const secret = (s.stripe_secret_key || '').trim();
@@ -608,11 +660,18 @@ app.post('/api/public/nailmind/stripe-webhook', wrap(async (req, res) => {
   const verified = await check.json();
   if (verified.payment_status !== 'paid') return res.json({ received: true });
 
-  const credits = Number((verified.metadata && verified.metadata.credits) || 0);
-  const pack = parsePacks(s).find(p => p.credits === credits);
-  const paidOk = pack && (!verified.amount_total || Number(verified.amount_total) === pack.dollars * 100);
+  const meta = verified.metadata || {};
+  const credits = Number(meta.credits || 0);
+  // Sessions our checkout endpoint created carry the pack key — validate the
+  // amount and credits against the server-side table, never the payload alone.
+  const table = nmStripePacks(s);
+  const pack = table[String(meta.pack)] ||
+    Object.values(table).find(p => p.credits === credits) || null;
+  const paidOk = pack && credits === pack.credits &&
+    (!verified.amount_total || Number(verified.amount_total) === pack.cents);
   const phoneField = (verified.custom_fields || []).find(f => f.key === 'phone');
-  const phone = strictPhone((phoneField && phoneField.text && phoneField.text.value) ||
+  const phone = strictPhone(meta.phone ||
+    (phoneField && phoneField.text && phoneField.text.value) ||
     (verified.customer_details && verified.customer_details.phone) || '');
   if (!credits || !pack || !paidOk || !phone) {
     console.error('Stripe webhook skipped:', { sessionId, credits, pack: !!pack, paidOk, phone: !!phone });
