@@ -1,10 +1,31 @@
 // Dream Nails POS — single serverless function (Express) for Vercel.
 // All /api/* routes land here via vercel.json rewrite.
 const express = require('express');
+const path = require('path');
 const XLSX = require('xlsx');
 const { q, ins, upd, del, rpc, uploadBinary } = require('../lib/supa');
 
 const app = express();
+
+// ---------- product domain: nailmind.app ----------
+// The global NailMind product lives on nailmind.app — landing at /, studio at
+// /app, shared gallery images, and ONLY the nailmind APIs. The salon's POS,
+// booking and kiosk never answer on this host; they stay on dreamnails.phaminh.com.
+const NM_HOSTS = new Set(['nailmind.app', 'www.nailmind.app']);
+const nmLanding = express.static(path.join(__dirname, '..', 'public', 'landing'));
+app.use((req, res, next) => {
+  const host = String(req.headers.host || '').split(':')[0].toLowerCase();
+  if (!NM_HOSTS.has(host)) return next();
+  if (req.path === '/app' || req.path === '/app/') {
+    return res.sendFile(path.join(__dirname, '..', 'public', 'nailmind.html'));
+  }
+  if (req.path.startsWith('/api/')) {
+    if (req.path.startsWith('/api/public/nailmind')) return next();
+    return res.status(404).json({ error: 'Not found' });
+  }
+  if (req.path.startsWith('/gallery/')) return next();
+  return nmLanding(req, res, () => res.status(404).send('Not found'));
+});
 
 // Body parsing that works both locally and on Vercel (which may pre-parse req.body)
 app.use((req, res, next) => {
