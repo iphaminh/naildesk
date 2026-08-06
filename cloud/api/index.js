@@ -19,8 +19,16 @@ app.use((req, res, next) => {
   if (req.path === '/app' || req.path === '/app/') {
     return res.sendFile(path.join(__dirname, '..', 'public', 'nailmind.html'));
   }
+  // NailMind's own back office lives here too — selling credits and issuing
+  // refunds belong with the product, not with the salon's POS.
+  if (req.path === '/admin' || req.path === '/admin/') {
+    return res.sendFile(path.join(__dirname, '..', 'public', 'admin', 'index.html'));
+  }
+  if (req.path.startsWith('/admin/')) return next();
   if (req.path.startsWith('/api/')) {
     if (req.path.startsWith('/api/public/nailmind')) return next();
+    if (req.path.startsWith('/api/nailmind/')) return next();
+    if (req.path === '/api/auth/check' || req.path === '/api/settings') return next();
     return res.status(404).json({ error: 'Not found' });
   }
   if (req.path.startsWith('/gallery/')) return next();
@@ -626,6 +634,75 @@ app.get('/api/nailmind/accounts', requirePin, wrap(async (req, res) => {
     parts.push(`or=(phone.ilike.${like},name.ilike.${like})`);
   }
   res.json(await q('nailmind_accounts', parts.join('&')));
+}));
+
+// Refund a NailMind purchase: money back through Stripe, credits clawed back.
+// A refund is always cheaper than a chargeback, so this path exists to be used
+// generously — the point is that an unhappy customer never has to call the bank.
+app.post('/api/nailmind/refund', requirePin, wrap(async (req, res) => {
+  const { ledger_id, reason = 'requested_by_customer' } = req.body || {};
+  const id = Number(ledger_id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'Which purchase? A ledger entry is required.' });
+  const s = await getSettings();
+  const sk = (s.stripe_secret_key || '').trim();
+
+  const [entry] = await q('nailmind_ledger', `id=eq.${id}&select=*&limit=1`);
+  if (!entry) return res.status(404).json({ error: 'That purchase was not found.' });
+  if (Number(entry.delta) <= 0) return res.status(400).json({ error: 'That entry is not a purchase.' });
+
+  const isStripe = entry.reason === 'stripe purchase';
+  const sessionId = String(entry.ref || '');
+  if (isStripe && !sk) return res.status(503).json({ error: 'Stripe key missing — cannot refund online purchases.' });
+
+  // Already refunded? The ledger is the source of truth.
+  const prior = await q('nailmind_ledger',
+    `account_id=eq.${entry.account_id}&reason=eq.refund&ref=eq.${encodeURIComponent(sessionId || ('ledger:' + entry.id))}&select=id&limit=1`);
+  if (prior.length) return res.status(409).json({ error: 'This purchase was already refunded.' });
+
+  let refundId = null, amount = null;
+  if (isStripe) {
+    // Look the session up rather than trusting stored data, then refund its payment.
+    const sess = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`,
+      { headers: { Authorization: `Bearer ${sk}` } });
+    if (!sess.ok) return res.status(400).json({ error: 'Could not find that payment in Stripe.' });
+    const session = await sess.json();
+    const pi = session.payment_intent;
+    if (!pi) return res.status(400).json({ error: 'That checkout has no payment to refund.' });
+    const r = await fetch('https://api.stripe.com/v1/refunds', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Basic ' + Buffer.from(sk + ':').toString('base64'),
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({ payment_intent: pi, reason }).toString()
+    });
+    const refund = await r.json();
+    if (!r.ok) {
+      console.error('Stripe refund failed:', refund.error && refund.error.message);
+      return res.status(502).json({ error: (refund.error && refund.error.message) || 'Stripe refused the refund.' });
+    }
+    refundId = refund.id;
+    amount = refund.amount;
+  }
+
+  // Take back what's left. If they already spent some, we still return the money —
+  // clawing a balance negative would just break the next purchase.
+  const [acct] = await q('nailmind_accounts', `id=eq.${entry.account_id}&select=*&limit=1`);
+  const clawback = Math.min(Number(entry.delta), Number(acct ? acct.credits : 0));
+  let balance = acct ? Number(acct.credits) : 0;
+  if (clawback > 0) balance = await nmAdjust(entry.account_id, -clawback, 'refund', sessionId || ('ledger:' + entry.id));
+  else await ins('nailmind_ledger', [{ account_id: entry.account_id, delta: 0, reason: 'refund', ref: sessionId || ('ledger:' + entry.id) }]);
+
+  res.json({
+    ok: true,
+    refunded_dollars: amount !== null ? amount / 100 : null,
+    credits_removed: clawback,
+    credits_left: balance,
+    stripe_refund: refundId,
+    note: clawback < Number(entry.delta)
+      ? 'Money refunded in full. Some credits were already spent, so only the unused ones were removed.'
+      : 'Money refunded and all credits removed.'
+  });
 }));
 
 app.get('/api/nailmind/accounts/:id/ledger', requirePin, wrap(async (req, res) => {

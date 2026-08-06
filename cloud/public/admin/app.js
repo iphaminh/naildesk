@@ -84,12 +84,30 @@ document.getElementById('lockBtn').onclick = e => {
   showLock();
 };
 
+/* On nailmind.app this admin manages the app only — the salon's pages live on
+   the salon's own site and have no data here, so hide them. */
+const NM_ONLY = /(^|\.)nailmind\.app$/i.test(location.hostname);
+if (NM_ONLY) {
+  document.querySelectorAll('#nav a').forEach(a => {
+    if (a.dataset.page !== 'nailmind' && a.dataset.page !== 'settings') a.remove();
+  });
+  const brand = document.querySelector('.brand');
+  if (brand) brand.innerHTML = '💎 NailMind';
+  const foot = document.querySelector('.sidebar-foot');
+  if (foot) foot.innerHTML = 'App pages:<br><a class="foot-link" href="/" target="_blank">Landing ↗</a><br>'
+    + '<a class="foot-link" href="/app" target="_blank">Studio ↗</a>'
+    + '<div style="margin-top:10px"><a class="foot-link" href="#" id="lockBtn2">🔒 Lock</a></div>';
+  const lb = document.getElementById('lockBtn2');
+  if (lb) lb.onclick = e => { e.preventDefault(); localStorage.removeItem('adminPin'); showLock(); };
+  if (!location.hash) location.hash = '#nailmind';
+}
+
 /* ---------- router ---------- */
 const pages = {};
 function navigate() {
-  const page = (location.hash || '#dashboard').slice(1).split('/')[0];
+  const page = (location.hash || (NM_ONLY ? '#nailmind' : '#dashboard')).slice(1).split('/')[0];
   document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('active', a.dataset.page === page));
-  (pages[page] || pages.dashboard)();
+  (pages[page] || (NM_ONLY ? pages.nailmind : pages.dashboard))();
 }
 window.addEventListener('hashchange', navigate);
 
@@ -815,13 +833,33 @@ pages.nailmind = async () => {
   $main.querySelectorAll('[data-sell]').forEach(b => b.onclick = () => nmSellForm(b.dataset.sell));
   $main.querySelectorAll('[data-ledger]').forEach(b => b.onclick = async () => {
     const rows = await api(`/api/nailmind/accounts/${b.dataset.ledger}/ledger`);
+    const refunded = new Set(rows.filter(r => r.reason === 'refund').map(r => String(r.ref)));
+    const isPurchase = r => Number(r.delta) > 0 && ['stripe purchase', 'front-desk sale', 'starter pack'].includes(r.reason);
     modal(`<h3>Credit history — ${esc(b.dataset.phone)}</h3>
-      ${rows.length ? `<table><thead><tr><th>When</th><th>What</th><th class="num">Credits</th></tr></thead><tbody>
+      ${rows.length ? `<table><thead><tr><th>When</th><th>What</th><th class="num">Credits</th><th></th></tr></thead><tbody>
         ${rows.map(r => `<tr><td class="muted">${String(r.created_at).slice(0, 16).replace('T', ' ')}</td>
-          <td>${esc(r.reason)}${r.ref ? ` <span class="muted">· ${esc(r.ref)}</span>` : ''}</td>
-          <td class="num" style="color:${Number(r.delta) >= 0 ? 'var(--green)' : 'var(--red)'}">${Number(r.delta) >= 0 ? '+' : ''}${Number(r.delta)}</td></tr>`).join('')}</tbody></table>`
+          <td>${esc(r.reason)}${r.ref ? ` <span class="muted">· ${esc(String(r.ref).slice(0, 28))}</span>` : ''}</td>
+          <td class="num" style="color:${Number(r.delta) >= 0 ? 'var(--green)' : 'var(--red)'}">${Number(r.delta) >= 0 ? '+' : ''}${Number(r.delta)}</td>
+          <td class="num">${isPurchase(r)
+            ? (refunded.has(String(r.ref)) || refunded.has('ledger:' + r.id)
+                ? '<span class="badge void">refunded</span>'
+                : `<button class="small danger" data-refund="${r.id}" data-acct="${b.dataset.ledger}" data-ph="${esc(b.dataset.phone)}">Refund</button>`)
+            : ''}</td></tr>`).join('')}</tbody></table>
+        <p class="muted" style="font-size:.8rem;margin-top:10px">Refunding sends the money back through Stripe and removes any credits they have not used yet. A refund always costs less than a chargeback — when in doubt, refund.</p>`
       : '<div class="empty">No activity yet.</div>'}
       <div class="actions"><button onclick="document.getElementById('modal-root').innerHTML=''">Close</button></div>`);
+    document.querySelectorAll('[data-refund]').forEach(rb => rb.onclick = async () => {
+      if (!confirm(`Refund this purchase for ${rb.dataset.ph}?\n\nThe money goes back to their card and unused credits are removed.`)) return;
+      rb.disabled = true; rb.textContent = 'Refunding…';
+      try {
+        const out = await api('/api/nailmind/refund', { method: 'POST', body: { ledger_id: Number(rb.dataset.refund) } });
+        toast(out.refunded_dollars !== null
+          ? `Refunded ${fmt$(out.refunded_dollars)} · ${out.credits_removed} credits removed`
+          : `${out.credits_removed} credits removed`);
+        closeModal();
+        if (pages.nailmind) pages.nailmind();
+      } catch (e) { toast(e.message, true); rb.disabled = false; rb.textContent = 'Refund'; }
+    });
   });
 };
 
