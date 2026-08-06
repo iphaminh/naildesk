@@ -92,20 +92,55 @@ async function textOwner(s, body) {
   } catch (e) { console.error('Twilio error:', e.message); return false; }
 }
 
+// Secrets must never travel to a browser, even an authenticated one: the admin
+// UI shows a masked placeholder and writes a new value, it never reads the old.
+const SECRET_SETTINGS = ['stripe_secret_key', 'gemini_api_key', 'twilio_token', 'twilio_sid', 'admin_pin'];
+function redactSettings(s) {
+  const out = { ...s };
+  for (const k of SECRET_SETTINGS) if (out[k]) out[k] = '__SET__';
+  return out;
+}
+
 // ---------- admin auth ----------
+// Failed PIN attempts are counted per IP: a 4-digit PIN is only 10,000 guesses,
+// so without a lockout the admin API is a few minutes of scripting away.
+const pinFails = new Map();
+function pinLocked(ip) {
+  const rec = pinFails.get(ip);
+  if (!rec) return false;
+  if (Date.now() - rec.at > 15 * 60000) { pinFails.delete(ip); return false; }
+  return rec.n >= 5;
+}
+function notePinFail(ip) {
+  const rec = pinFails.get(ip) || { n: 0, at: Date.now() };
+  rec.n += 1; rec.at = Date.now();
+  pinFails.set(ip, rec);
+}
+
 async function requirePin(req, res, next) {
   try {
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+    if (pinLocked(ip)) return res.status(429).json({ error: 'Too many attempts — wait 15 minutes.' });
     const s = await getSettings();
-    const pin = req.headers['x-admin-pin'] || req.query.pin;
-    if (!pin || String(pin) !== String(s.admin_pin)) return res.status(401).json({ error: 'PIN required' });
+    // Header only: a PIN in the query string leaks into browser history,
+    // referrer headers and every proxy log along the way.
+    const pin = req.headers['x-admin-pin'];
+    if (!pin || String(pin) !== String(s.admin_pin)) {
+      notePinFail(ip);
+      return res.status(401).json({ error: 'PIN required' });
+    }
+    pinFails.delete(ip);
     next();
   } catch (e) { res.status(500).json({ error: e.message }); }
 }
 
 app.post('/api/auth/check', wrap(async (req, res) => {
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+  if (pinLocked(ip)) return res.status(429).json({ error: 'Too many attempts — wait 15 minutes.' });
   const s = await getSettings();
   const pin = req.headers['x-admin-pin'] || (req.body && req.body.pin);
-  if (String(pin) === String(s.admin_pin)) return res.json({ ok: true });
+  if (String(pin) === String(s.admin_pin)) { pinFails.delete(ip); return res.json({ ok: true }); }
+  notePinFail(ip);
   res.status(401).json({ error: 'Wrong PIN' });
 }));
 
@@ -477,7 +512,18 @@ app.post('/api/public/nailmind/account', wrap(async (req, res) => {
     return res.json({ ok: true, otp: true });
   }
 
-  // Kiosk mode — no SMS verification available; sign in directly.
+  // No SMS available. A brand-new number may sign in directly — there is
+  // nothing to steal and this keeps the funnel frictionless. But an account
+  // that already holds credits or saved designs must never be handed over on
+  // the strength of typing its phone number, so those require verification.
+  const [hasDesigns] = await q('nailmind_designs', `account_id=eq.${acct.id}&select=id&limit=1`);
+  const valuable = Number(acct.credits) > 0 || !!hasDesigns;
+  if (valuable) {
+    return res.status(409).json({
+      error: 'VERIFY_UNAVAILABLE',
+      message: 'This number already has an account. Text verification is not switched on yet — please contact support@nailmind.app to get back in.'
+    });
+  }
   const token = nmToken();
   await upd('nailmind_accounts', `id=eq.${acct.id}`, { token });
   const credits = await nmWelcomeIfFirst(acct, s);
@@ -787,7 +833,7 @@ app.post('/api/public/nailmind-generate', wrap(async (req, res) => {
 app.get('/api/dashboard', requirePin, wrap(async (req, res) => {
   const s = await getSettings();
   const stats = await rpc('dashboard_stats', { atrisk_days: Number(s.atrisk_days) });
-  res.json({ ...stats, settings: s });
+  res.json({ ...stats, settings: redactSettings(s) });
 }));
 
 // ---------- customers ----------
@@ -1258,12 +1304,16 @@ app.get('/api/reports/customers.csv', requirePin, wrap(async (req, res) => {
 }));
 
 // ---------- settings ----------
-app.get('/api/settings', requirePin, wrap(async (req, res) => res.json(await getSettings(true))));
+app.get('/api/settings', requirePin, wrap(async (req, res) => res.json(redactSettings(await getSettings(true)))));
 
 app.put('/api/settings', requirePin, wrap(async (req, res) => {
-  const entries = Object.entries(req.body || {}).map(([key, value]) => ({ key, value: String(value) }));
+  // '__SET__' is what a redacted secret looks like coming back from the admin
+  // form — it means "unchanged", so drop it rather than overwriting the real key.
+  const entries = Object.entries(req.body || {})
+    .filter(([, value]) => String(value) !== '__SET__')
+    .map(([key, value]) => ({ key, value: String(value) }));
   if (entries.length) await ins('settings', entries, { onConflict: 'key', merge: true });
-  res.json(await getSettings(true));
+  res.json(redactSettings(await getSettings(true)));
 }));
 
 app.post('/api/settings/test-text', requirePin, wrap(async (req, res) => {

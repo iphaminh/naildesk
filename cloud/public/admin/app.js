@@ -34,6 +34,28 @@ function modal(html) {
 }
 function closeModal() { $modal.innerHTML = ''; }
 
+
+/* CSV download with the PIN in a header, never in the URL (URLs leak into
+   history, referrers and proxy logs). */
+async function downloadCsv(){
+  try{
+    const r = await fetch('/api/reports/customers.csv', { headers: { 'x-admin-pin': pin() } });
+    if (!r.ok) return toast('Could not export — check your PIN', true);
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'customer_report.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(a.href);
+  }catch(e){ toast('Could not export', true); }
+}
+
+
+/* Secrets come back from the API as '__SET__' (never the real value). Show an
+   empty box with a saved hint; leaving it empty keeps the stored key. */
+const secretVal = v => (v === '__SET__' ? '' : (v || ''));
+const secretPh = (v, ph) => (v === '__SET__' ? '•••••• saved — type to replace' : ph);
+
 /* ---------- lock screen ---------- */
 function showLock() {
   document.getElementById('lock').classList.remove('hidden');
@@ -515,7 +537,7 @@ pages.customers = async () => {
         <option value="away" ${sort === 'away' ? 'selected' : ''}>Longest away</option>
       </select>
       <button class="primary" id="cAdd">＋ Add customer</button>
-      <a href="/api/reports/customers.csv?pin=${encodeURIComponent(pin())}"><button>⬇ Export CSV</button></a>
+      <button onclick="downloadCsv()">⬇ Export CSV</button>
     </div>
     <div class="panel">
       <table><thead><tr><th>Customer</th><th>Class</th><th class="num">Visits</th><th class="num">Lifetime</th><th>Last visit</th><th class="num">Days away</th><th class="num">Points</th></tr></thead>
@@ -850,7 +872,7 @@ pages.reports = async () => {
       <div class="field"><label>From</label><input type="date" id="rFrom" value="${from}"></div>
       <div class="field"><label>To</label><input type="date" id="rTo" value="${to}"></div>
       <button class="primary" id="rRun">Run</button>
-      <a href="/api/reports/customers.csv?pin=${encodeURIComponent(pin())}"><button>⬇ Customer report CSV</button></a>
+      <button onclick="downloadCsv()">⬇ Customer report CSV</button>
     </div>
     <div id="rOut"></div>`;
   const run = async () => {
@@ -958,7 +980,7 @@ pages.settings = async () => {
       <h2>NailMind AI images</h2>
       <p class="muted" style="font-size:.8rem;margin-bottom:10px">Paste a Google AI Studio key (aistudio.google.com — image generation needs billing enabled on the key). About 4 cents per image; the daily cap below is your spending brake for guest use.</p>
       <div class="row" style="margin-bottom:12px">
-        <div class="field"><label>Google AI API key</label><input id="stGKey" type="password" value="${esc(s.gemini_api_key || '')}" placeholder="AIza..."></div>
+        <div class="field"><label>Google AI API key</label><input id="stGKey" type="password" value="${esc(secretVal(s.gemini_api_key))}" placeholder="${esc(secretPh(s.gemini_api_key, 'AIza...'))}"></div>
         <div class="field"><label>Images per tap</label><input id="stGN" type="number" min="1" max="6" value="${esc(s.nailmind_images_per_generate || 3)}"></div>
         <div class="field"><label>Guest daily image cap</label><input id="stGCap" type="number" value="${esc(s.nailmind_daily_limit || 60)}"></div>
       </div>
@@ -975,13 +997,13 @@ pages.settings = async () => {
         <div class="field"><label>Stripe link — 60-credit pack</label><input id="stNmL3" value="${esc(s.stripe_link_60 || '')}" placeholder="https://buy.stripe.com/…"></div>
       </div>
       <div class="row" style="margin-bottom:12px">
-        <div class="field"><label>Stripe secret key (auto-credit online buys)</label><input id="stNmSk" type="password" value="${esc(s.stripe_secret_key || '')}" placeholder="sk_live_…"></div>
+        <div class="field"><label>Stripe secret key (auto-credit online buys)</label><input id="stNmSk" type="password" value="${esc(secretVal(s.stripe_secret_key))}" placeholder="${esc(secretPh(s.stripe_secret_key, 'sk_live_…'))}"></div>
       </div>
       <h2>Text alerts (your existing Twilio account)</h2>
       <p class="muted" style="font-size:.8rem;margin-bottom:10px">Paste the same values from your nails-by-minh Vercel settings. Same account, same number, nothing new to buy. The system texts YOUR cell when a booking comes in.</p>
       <div class="row" style="margin-bottom:12px">
-        <div class="field"><label>Twilio Account SID</label><input id="stTwSid" value="${esc(s.twilio_sid || '')}" placeholder="AC..."></div>
-        <div class="field"><label>Twilio Auth Token</label><input id="stTwTok" type="password" value="${esc(s.twilio_token || '')}" placeholder="paste from Twilio Console"></div>
+        <div class="field"><label>Twilio Account SID</label><input id="stTwSid" value="${esc(secretVal(s.twilio_sid))}" placeholder="${esc(secretPh(s.twilio_sid, 'AC...'))}"></div>
+        <div class="field"><label>Twilio Auth Token</label><input id="stTwTok" type="password" value="${esc(secretVal(s.twilio_token))}" placeholder="${esc(secretPh(s.twilio_token, 'paste from Twilio Console'))}"></div>
       </div>
       <div class="row" style="margin-bottom:12px">
         <div class="field"><label>Twilio number (from)</label><input id="stTwFrom" value="${esc(s.twilio_from || '')}" placeholder="+16282586688"></div>
@@ -995,7 +1017,7 @@ pages.settings = async () => {
       </div>
       <h2>Security</h2>
       <div class="row" style="margin-bottom:12px">
-        <div class="field"><label>Owner PIN</label><input id="stPin" value="${esc(s.admin_pin || '')}"></div>
+        <div class="field"><label>Owner PIN</label><input id="stPin" type="password" value="" placeholder="•••••• saved — type a new PIN (8+ digits)"></div>
       </div>
       <div class="actions" style="justify-content:flex-start">
         <button class="primary" id="stSave">Save settings</button>
@@ -1003,7 +1025,7 @@ pages.settings = async () => {
       </div>
     </div>`;
   document.getElementById('stSave').onclick = async () => {
-    const newPin = document.getElementById('stPin').value.trim();
+    const newPin = document.getElementById('stPin').value.trim(); /* blank = unchanged */
     await api('/api/settings', { method: 'PUT', body: {
       salon_name: document.getElementById('stName').value,
       loyal_min_visits: document.getElementById('stLoyal').value,
@@ -1023,7 +1045,7 @@ pages.settings = async () => {
       close_time: document.getElementById('stClose').value,
       slot_minutes: document.getElementById('stStep').value,
       slot_capacity: document.getElementById('stCapS').value,
-      gemini_api_key: document.getElementById('stGKey').value.trim(),
+      gemini_api_key: document.getElementById('stGKey').value.trim() || '__SET__',
       nailmind_images_per_generate: document.getElementById('stGN').value,
       nailmind_daily_limit: document.getElementById('stGCap').value,
       nailmind_welcome_credits: document.getElementById('stNmWelcome').value,
@@ -1031,13 +1053,13 @@ pages.settings = async () => {
       stripe_link_10: document.getElementById('stNmL1').value.trim(),
       stripe_link_25: document.getElementById('stNmL2').value.trim(),
       stripe_link_60: document.getElementById('stNmL3').value.trim(),
-      stripe_secret_key: document.getElementById('stNmSk').value.trim(),
-      twilio_sid: document.getElementById('stTwSid').value.trim(),
-      twilio_token: document.getElementById('stTwTok').value.trim(),
+      stripe_secret_key: document.getElementById('stNmSk').value.trim() || '__SET__',
+      twilio_sid: document.getElementById('stTwSid').value.trim() || '__SET__',
+      twilio_token: document.getElementById('stTwTok').value.trim() || '__SET__',
       twilio_from: document.getElementById('stTwFrom').value.trim(),
       owner_cell: document.getElementById('stTwTo').value.trim(),
       notify_on_booking: document.getElementById('stTwOn').value,
-      admin_pin: newPin
+      admin_pin: newPin || '__SET__'
     } });
     if (newPin) localStorage.setItem('adminPin', newPin);
     toast('Settings saved');

@@ -1,13 +1,20 @@
 // Thin PostgREST client for the dream-nails-pos Supabase project.
-// The key below is the "anon" publishable key; it only lives server-side here.
-// Hardening step for later: move to a service_role key in a Vercel env var and
-// tighten the RLS policies (see README).
+//
+// This key is the database's master key — it must NEVER reach a browser and must
+// never be committed. It is read from the environment, or from lib/secrets.json,
+// which is gitignored and shipped only inside the deploy archive.
 if (typeof globalThis.fetch !== 'function') {
   globalThis.fetch = require('undici').fetch;
 }
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://maqsptfpfdgcxielnnrz.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hcXNwdGZwZmRnY3hpZWxubnJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyODc5NzIsImV4cCI6MjA5OTg2Mzk3Mn0.vCcrcmCm9fvqNQJNO5QjwUwn6YJqfNDy0r_izkfYHJ0';
+let fileSecrets = {};
+try { fileSecrets = require('./secrets.json'); } catch (e) { /* env-only deployments */ }
+
+const SUPABASE_URL = process.env.SUPABASE_URL || fileSecrets.SUPABASE_URL || 'https://maqsptfpfdgcxielnnrz.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_KEY || fileSecrets.SUPABASE_KEY;
+if (!SUPABASE_KEY) {
+  throw new Error('Supabase key missing: set SUPABASE_KEY or create cloud/lib/secrets.json');
+}
 
 const REST = `${SUPABASE_URL}/rest/v1`;
 
