@@ -765,6 +765,12 @@ app.post('/api/public/nailmind/checkout', wrap(async (req, res) => {
     'metadata[phone]': acct.phone,
     'metadata[credits]': String(chosen.credits),
     'metadata[pack]': String(pack),
+    // Which state a customer bought from decides, later, whether sales tax was
+    // ever owed there. Stripe only collects an address when the payment method
+    // demands one, so without this a year of sales arrives with no state on it
+    // — and it cannot be reconstructed afterwards. One extra field now beats an
+    // unanswerable question in 2027.
+    billing_address_collection: 'required',
   });
   const r = await fetch('https://api.stripe.com/v1/checkout/sessions', {
     method: 'POST',
