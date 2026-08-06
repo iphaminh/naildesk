@@ -100,6 +100,15 @@ if (NM_ONLY) {
   const lb = document.getElementById('lockBtn2');
   if (lb) lb.onclick = e => { e.preventDefault(); localStorage.removeItem('adminPin'); showLock(); };
   if (!location.hash) location.hash = '#nailmind';
+} else {
+  // The mirror image, and the more important half: NailMind's customers and
+  // their credit balances have no business being reachable from the salon's
+  // register, which the whole front desk unlocks with one shared PIN. The
+  // server enforces this too — see the salon host gate in api/index.js; this
+  // only keeps a dead link out of the sidebar.
+  document.querySelectorAll('#nav a').forEach(a => {
+    if (a.dataset.page === 'nailmind') a.remove();
+  });
 }
 
 /* ---------- router ---------- */

@@ -25,6 +25,11 @@ app.use((req, res, next) => {
     return res.sendFile(path.join(__dirname, '..', 'public', 'admin', 'index.html'));
   }
   if (req.path.startsWith('/admin/')) return next();
+  // /terms and /privacy without the extension — these get printed on receipts
+  // and pasted into App Store Connect, so they should be typeable.
+  if (req.path === '/terms' || req.path === '/privacy') {
+    return res.sendFile(path.join(__dirname, '..', 'public', 'landing', req.path.slice(1) + '.html'));
+  }
   if (req.path.startsWith('/api/')) {
     if (req.path.startsWith('/api/public/nailmind')) return next();
     if (req.path.startsWith('/api/nailmind/')) return next();
@@ -33,6 +38,16 @@ app.use((req, res, next) => {
   }
   if (req.path.startsWith('/gallery/')) return next();
   return nmLanding(req, res, () => res.status(404).send('Not found'));
+});
+
+// The other direction. NailMind's members, their balances and their refunds are
+// reachable behind one shared PIN — the same PIN the whole front desk types to
+// open the register. Salon staff are not NailMind staff, so the salon's domain
+// does not get these routes at all.
+app.use('/api/nailmind', (req, res, next) => {
+  const host = String(req.headers.host || '').split(':')[0].toLowerCase();
+  if (NM_HOSTS.has(host) || host === 'localhost' || host === '127.0.0.1') return next();
+  return res.status(404).json({ error: 'Not found' });
 });
 
 // Body parsing that works both locally and on Vercel (which may pre-parse req.body)
@@ -818,7 +833,19 @@ app.post('/api/public/nailmind/stripe-webhook', wrap(async (req, res) => {
   res.json({ received: true, credited: credits });
 }));
 
-async function geminiImage(key, prompt) {
+// The API rejects an unknown aspect ratio with a 400, so a typo in the admin
+// settings would take generation down entirely. Anything unrecognised falls
+// back to the default instead.
+const ASPECT_RATIOS = new Set(['1:1', '1:4', '1:8', '2:3', '3:2', '3:4', '4:1',
+  '4:3', '4:5', '5:4', '8:1', '9:16', '16:9', '21:9']);
+const DEFAULT_ASPECT = '4:5';
+
+function safeAspect(value) {
+  const v = String(value || '').trim();
+  return ASPECT_RATIOS.has(v) ? v : DEFAULT_ASPECT;
+}
+
+async function geminiImage(key, prompt, aspect) {
   const models = ['gemini-2.5-flash-image', 'gemini-2.5-flash-image-preview'];
   let lastErr = null;
   for (const model of models) {
@@ -827,7 +854,12 @@ async function geminiImage(key, prompt) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
+        generationConfig: {
+          responseModalities: ['TEXT', 'IMAGE'],
+          // Portrait by default: these are looked at on a phone and saved to a
+          // camera roll. Left alone the model returns 1024x1024 squares.
+          imageConfig: { aspectRatio: safeAspect(aspect) }
+        }
       })
     });
     const d = await r.json().catch(() => ({}));
@@ -839,6 +871,18 @@ async function geminiImage(key, prompt) {
     lastErr = 'no image in response';
   }
   throw new Error(lastErr || 'no image generated');
+}
+
+// Who is this guest, roughly? Enough to stop one person eating the whole free
+// tier, not enough to identify anyone: the IP and browser are hashed together
+// and only the hash is stored, so the database never holds a raw IP address.
+// It is deliberately beatable — a determined visitor can switch networks and
+// get another free design. That is a fine trade for never blocking a real one.
+function guestFingerprint(req) {
+  const fwd = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  const ip = fwd || req.socket.remoteAddress || 'unknown';
+  const ua = String(req.headers['user-agent'] || '').slice(0, 200);
+  return require('crypto').createHash('sha256').update(`${ip}|${ua}`).digest('hex').slice(0, 32);
 }
 
 app.post('/api/public/nailmind-generate', wrap(async (req, res) => {
@@ -853,11 +897,13 @@ app.post('/api/public/nailmind-generate', wrap(async (req, res) => {
 
   // Signed-in members (phone + token) spend 1 credit per generation, charged
   // atomically BEFORE the images run (refunded if generation fails). Guests
-  // draw from the salon's shared daily pool.
+  // get a free taste counted against their own device — not against everyone
+  // else's — with a global ceiling behind it that exists only to cap spend.
   let acct = null;
   const n = Math.min(6, Math.max(1, Number(s.nailmind_images_per_generate || 3)));
-  const limit = Number(s.nailmind_daily_limit || 60);
-  let used = null, creditsLeft = null;
+  const limit = Number(s.nailmind_daily_limit || 400);
+  const perPerson = Number(s.nailmind_guest_daily_images || 2);
+  let used = null, creditsLeft = null, guestFp = null;
 
   const phone = (req.body || {}).phone;
   if (phone) {
@@ -872,22 +918,48 @@ app.post('/api/public/nailmind-generate', wrap(async (req, res) => {
       throw e;
     }
   } else {
-    used = await rpc('nm_count', { p_n: n });
-    if (used > limit) {
-      return res.status(429).json({ error: 'GUEST_LIMIT', message: 'Today\'s free design studio is full. Sign in with your phone number to keep going!' });
+    guestFp = guestFingerprint(req);
+    const gate = await rpc('nm_guest_reserve', { p_fp: guestFp, p_n: n, p_per_person: perPerson, p_global: limit });
+    used = gate && gate.global_used;
+    if (!gate || !gate.allowed) {
+      // Two very different situations, and the visitor deserves to know which.
+      // "You've had your free one" is an invitation. "We're at capacity" is our
+      // problem, not theirs — saying so is what keeps it from reading as a
+      // broken app they never come back to.
+      if (gate && gate.why === 'global') {
+        return res.status(429).json({
+          error: 'STUDIO_BUSY',
+          message: 'The free studio is packed right now — so many people designing today! Credits still work instantly, or come back tomorrow when free designs reset.'
+        });
+      }
+      return res.status(429).json({
+        error: 'GUEST_LIMIT',
+        message: 'That was your free design for today. Sign in with your number to keep going — the first credit is on us.'
+      });
     }
   }
 
-  const base = `Professional close-up photograph of an elegant hand with ${length || 'medium'} ${shape || 'almond'} shaped manicured nails. Nail design: ${userPrompt}. Salon quality nail art, soft natural lighting, clean warm neutral background, sharp focus on the nails, photorealistic, no text, no watermark.`;
+  // Written as a photograph, not a keyword list — Google's guidance is that
+  // these models reward describing a scene over listing tags. Three things
+  // in here earn their keep:
+  // the fingers are described as separate and fully visible (occlusion, not
+  // counting, is what produces fused and extra fingers); skin is given real
+  // texture (plastic skin is the giveaway that an image is generated); and the
+  // manicure is pinned to what a tech could actually execute in one
+  // appointment, stated as craft facts rather than as a list of bans.
+  const base = `A photorealistic close-up beauty photograph of a single relaxed right hand, fingers gently fanned and softly curved so the four fingernails and the thumbnail are each clearly separate and fully visible, resting on a warm neutral matte surface. Natural skin with fine pores, soft knuckle creases and neat cuticles. The ${length || 'medium'} ${shape || 'almond'} nails wear this design: ${userPrompt}. It is a manicure a real nail technician could complete in one appointment with ordinary salon products — even free-edge lengths across all five nails, a crisp cuticle line with the product stopping at the skin, and every detail painted, embedded or cured flush under a glossy gel topcoat rather than floating above the nail. One large softbox to camera left with a white bounce card filling the shadows leaves a single soft highlight running down each nail. Shot on a 100mm macro lens at f/8, slightly elevated three-quarter angle; all five nails sharp, the plain unmarked background softly defocused.`;
+
+  // Every variation moves the CAMERA, never the design. The old set changed the
+  // accent finger and the colour between images, which is why a pair of results
+  // could look like two different manicures instead of two photos of one.
   const twists = [
     '',
-    ' Slightly different angle, fingers gently curled, alternate take on the same design.',
-    ' A creative variation of the same design concept with a different accent finger.',
-    ' Same concept, softer pastel interpretation, top-down view.',
-    ' Same concept, bolder richer color interpretation.',
-    ' Same concept, minimal clean interpretation.'
+    ' The same hand, same manicure, same lighting and same background, seen from a slightly different angle with the fingers a touch more curled.',
+    ' The same hand and the same manicure, same lighting and background, tilted so the nail tips catch the light.',
+    ' The same hand and the same manicure, same lighting and background, framed a little closer with the fingers relaxed.'
   ];
-  const jobs = Array.from({ length: n }, (_, i) => geminiImage(key, base + twists[i % twists.length]));
+  const aspect = safeAspect(s.nailmind_aspect_ratio);
+  const jobs = Array.from({ length: n }, (_, i) => geminiImage(key, base + twists[i % twists.length], aspect));
   const settled = await Promise.allSettled(jobs);
   const images = settled.filter(x => x.status === 'fulfilled').map(x => x.value);
   if (!images.length) {
@@ -896,6 +968,9 @@ app.post('/api/public/nailmind-generate', wrap(async (req, res) => {
     console.error('NailMind generation failed:', raw);
     // Failed generations are free — give the pre-charged credit back
     if (acct) creditsLeft = await nmAdjust(acct.id, 1, 'refund: generation failed').catch(() => null);
+    // ...and a guest whose one free design failed should not be locked out
+    // for the rest of the day over an image that never arrived.
+    if (guestFp) await rpc('nm_guest_release', { p_fp: guestFp, p_n: n }).catch(() => {});
     // Clients see friendly copy, never raw provider errors
     let friendly = 'The design studio is warming up. Please try again in a moment.';
     if (/quota|billing|exceeded/i.test(raw)) friendly = 'The design studio is resting right now. Please ask the front desk, or try again later.';
@@ -903,7 +978,20 @@ app.post('/api/public/nailmind-generate', wrap(async (req, res) => {
     return res.status(502).json({ error: friendly, credits: creditsLeft });
   }
 
-  res.json({ images, used, limit, credits: creditsLeft });
+  // A credit buys `n` images. If only some of them came back — one variation
+  // tripped a safety filter, one call timed out — the customer paid in full for
+  // a part order. Hand back the credit and let them keep what did arrive. It
+  // costs a few cents on a rare event and it is the answer that keeps someone
+  // from feeling cheated by a machine.
+  let shortfall = false;
+  if (images.length < n) {
+    shortfall = true;
+    console.error(`NailMind partial generation: ${images.length}/${n} images`);
+    if (acct) creditsLeft = await nmAdjust(acct.id, 1, 'refund: partial generation', `${images.length}/${n}`).catch(() => creditsLeft);
+    if (guestFp) await rpc('nm_guest_release', { p_fp: guestFp, p_n: n }).catch(() => {});
+  }
+
+  res.json({ images, used, limit, credits: creditsLeft, shortfall });
 }));
 
 // ---------- dashboard ----------
