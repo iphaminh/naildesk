@@ -845,8 +845,23 @@ function safeAspect(value) {
   return ASPECT_RATIOS.has(v) ? v : DEFAULT_ASPECT;
 }
 
-async function geminiImage(key, prompt, aspect) {
-  const models = ['gemini-2.5-flash-image', 'gemini-2.5-flash-image-preview'];
+// Two tiers, because the free tier is the only cost here that nobody pays for.
+// Paying customers get the best model; strangers trying it for the first time
+// get the cheap one, which with the new prompt still looks good. That way the
+// quality upgrade lands on the people funding it instead of on the bill.
+//
+// Each entry falls back down its own list, so a model being retired or renamed
+// degrades to a working one rather than taking generation down.
+const IMAGE_MODELS = {
+  'gemini-3-pro-image':     ['gemini-3-pro-image', 'gemini-3-pro-image-preview', 'gemini-3.1-flash-image', 'gemini-2.5-flash-image'],
+  'gemini-3.1-flash-image': ['gemini-3.1-flash-image', 'gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image'],
+  'gemini-2.5-flash-image': ['gemini-2.5-flash-image', 'gemini-2.5-flash-image-preview'],
+};
+const DEFAULT_PAID_MODEL = 'gemini-3.1-flash-image';
+const DEFAULT_FREE_MODEL = 'gemini-2.5-flash-image';
+
+async function geminiImage(key, prompt, aspect, model) {
+  const models = IMAGE_MODELS[model] || IMAGE_MODELS[DEFAULT_FREE_MODEL];
   let lastErr = null;
   for (const model of models) {
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`, {
@@ -959,7 +974,10 @@ app.post('/api/public/nailmind-generate', wrap(async (req, res) => {
     ' The same hand and the same manicure, same lighting and background, framed a little closer with the fingers relaxed.'
   ];
   const aspect = safeAspect(s.nailmind_aspect_ratio);
-  const jobs = Array.from({ length: n }, (_, i) => geminiImage(key, base + twists[i % twists.length], aspect));
+  // A credit was spent, so this is a customer: give them the good model.
+  const model = acct ? (s.nailmind_model_paid || DEFAULT_PAID_MODEL)
+                     : (s.nailmind_model_free || DEFAULT_FREE_MODEL);
+  const jobs = Array.from({ length: n }, (_, i) => geminiImage(key, base + twists[i % twists.length], aspect, model));
   const settled = await Promise.allSettled(jobs);
   const images = settled.filter(x => x.status === 'fulfilled').map(x => x.value);
   if (!images.length) {
