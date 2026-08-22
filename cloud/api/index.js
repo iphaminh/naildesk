@@ -3,7 +3,7 @@
 const express = require('express');
 const path = require('path');
 const XLSX = require('xlsx');
-const { q, ins, upd, del, rpc, uploadBinary } = require('../lib/supa');
+const { q, ins, upd, del, rpc, uploadBinary, downloadBinary, deleteBinary } = require('../lib/supa');
 
 const app = express();
 
@@ -726,6 +726,130 @@ app.get('/api/nailmind/accounts/:id/ledger', requirePin, wrap(async (req, res) =
   res.json(await q('nailmind_ledger', `account_id=eq.${Number(req.params.id)}&order=created_at.desc&limit=100&select=*`));
 }));
 
+// ---------- NailMind reference gallery (founder-curated, never public) ----------
+// Real nail-art photos the founder rates highly, stored in a PRIVATE bucket.
+// Generation retrieves the closest matches to the client's prompt and attaches
+// them to the image request as the bar for realism and design strength — the
+// model is told to match the standard, never to copy a reference. The images
+// deliberately have no public URL: only these PIN-gated routes and the
+// generator can read them.
+const REF_BUCKET = 'nm-refs';
+const TAG_MODELS = ['gemini-3-flash', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+
+// One vision call per upload turns a photo into searchable metadata. Costs a
+// fraction of a cent, runs once, and is what lets a client's "chocolate chrome
+// french" find the right references later.
+async function nmDescribeRef(key, mime, b64) {
+  const ask = 'This photo goes into a salon\'s private nail-design reference library. Reply with ONLY minified JSON, no markdown fences: {"descr":"one line, max 12 words","tags":["10-16 lowercase terms covering colors, finish, technique, art elements, vibe, occasion, season"],"shape":"almond|square|coffin|stiletto|oval|round or empty string","length":"short|medium|long or empty string"}';
+  for (const model of TAG_MODELS) {
+    try {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ inlineData: { mimeType: mime, data: b64 } }, { text: ask }] }] })
+      });
+      if (r.status === 404) continue;
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) continue;
+      const text = ((((d.candidates || [])[0] || {}).content || {}).parts || []).map(p => p.text || '').join('');
+      const m = text.match(/\{[\s\S]*\}/);
+      if (!m) continue;
+      const j = JSON.parse(m[0]);
+      return {
+        descr: String(j.descr || '').slice(0, 120),
+        tags: Array.isArray(j.tags) ? j.tags.map(t => String(t).toLowerCase().trim()).filter(Boolean).slice(0, 20) : [],
+        shape: String(j.shape || '').toLowerCase().slice(0, 20),
+        length: String(j.length || '').toLowerCase().slice(0, 20)
+      };
+    } catch (e) { /* try the next model */ }
+  }
+  // Untagged uploads still land — the admin grid shows them as untagged so the
+  // founder can delete and retry, rather than losing the photo.
+  return { descr: '', tags: [], shape: '', length: '' };
+}
+
+const REF_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+app.get('/api/nailmind/refs', requirePin, wrap(async (req, res) => {
+  res.json(await q('nailmind_ref_designs', 'order=created_at.desc&limit=500&select=id,descr,tags,shape,length,quality,enabled,created_at'));
+}));
+
+app.post('/api/nailmind/refs', requirePin, wrap(async (req, res) => {
+  const s = await getSettings();
+  const m = String((req.body || {}).image || '').match(/^data:(image\/(?:jpeg|png|webp));base64,(.+)$/);
+  if (!m) return res.status(400).json({ error: 'Send an image as a data URL (jpeg, png or webp).' });
+  const bytes = Buffer.from(m[2], 'base64');
+  if (bytes.length > 8 * 1024 * 1024) return res.status(413).json({ error: 'Image too large — keep references under 8 MB.' });
+  const ext = m[1] === 'image/png' ? 'png' : m[1] === 'image/webp' ? 'webp' : 'jpg';
+  const objectPath = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
+  await uploadBinary(REF_BUCKET, objectPath, bytes, m[1]);
+  const key = (s.gemini_api_key || '').trim();
+  const meta = key ? await nmDescribeRef(key, m[1], m[2]) : { descr: '', tags: [], shape: '', length: '' };
+  const rows = await ins('nailmind_ref_designs', [{ path: objectPath, mime: m[1], ...meta }]);
+  res.json(rows[0]);
+}));
+
+app.get('/api/nailmind/refs/:id/image', requirePin, wrap(async (req, res) => {
+  if (!REF_UUID.test(req.params.id)) return res.status(400).json({ error: 'Bad id' });
+  const rows = await q('nailmind_ref_designs', `id=eq.${req.params.id}&select=path,mime&limit=1`);
+  if (!rows.length) return res.status(404).json({ error: 'Not found' });
+  const { buffer, contentType } = await downloadBinary(REF_BUCKET, rows[0].path);
+  res.set('Content-Type', contentType || rows[0].mime);
+  res.set('Cache-Control', 'private, max-age=3600');
+  res.send(buffer);
+}));
+
+app.patch('/api/nailmind/refs/:id', requirePin, wrap(async (req, res) => {
+  if (!REF_UUID.test(req.params.id)) return res.status(400).json({ error: 'Bad id' });
+  const patch = {};
+  const b = req.body || {};
+  if (b.enabled !== undefined) patch.enabled = !!b.enabled;
+  if (b.quality !== undefined) patch.quality = Math.min(5, Math.max(1, Number(b.quality) || 3));
+  if (!Object.keys(patch).length) return res.status(400).json({ error: 'Nothing to update' });
+  const rows = await upd('nailmind_ref_designs', `id=eq.${req.params.id}`, patch);
+  res.json(rows[0] || { ok: true });
+}));
+
+app.delete('/api/nailmind/refs/:id', requirePin, wrap(async (req, res) => {
+  if (!REF_UUID.test(req.params.id)) return res.status(400).json({ error: 'Bad id' });
+  const rows = await q('nailmind_ref_designs', `id=eq.${req.params.id}&select=path&limit=1`);
+  if (rows.length) await deleteBinary(REF_BUCKET, rows[0].path).catch(() => {});
+  await del('nailmind_ref_designs', `id=eq.${req.params.id}`);
+  res.json({ ok: true });
+}));
+
+// Which references fit this prompt? Plain token overlap against the auto-tags
+// is enough at this scale — no embeddings, no extra service, nothing to break.
+const REF_STOP = new Set(['and', 'with', 'the', 'for', 'nails', 'nail', 'set', 'some', 'little', 'bit', 'not', 'too', 'very', 'more', 'less', 'like', 'style', 'design', 'designs', 'manicure', 'pretty', 'cute', 'nice']);
+function nmRefTokens(text) {
+  return [...new Set(String(text).toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 3 && !REF_STOP.has(w)))];
+}
+function nmRefScore(tokens, shape, ref) {
+  const bag = new Set([...(ref.tags || []), ...nmRefTokens(ref.descr)]);
+  let score = 0;
+  for (const t of tokens) if (bag.has(t)) score += 1;
+  if (shape && ref.shape && ref.shape === String(shape).toLowerCase()) score += 1.5;
+  // quality is a tiebreak, never a reason to include an unrelated reference
+  return score ? score + (Number(ref.quality) || 3) * 0.15 : 0;
+}
+async function nmPickRefs(prompt, shape) {
+  const refs = await q('nailmind_ref_designs', 'enabled=eq.true&select=id,path,mime,tags,descr,shape,quality&limit=500');
+  const tokens = nmRefTokens(prompt);
+  const picked = refs
+    .map(r => ({ r, score: nmRefScore(tokens, shape, r) }))
+    .filter(x => x.score >= 1)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
+  const parts = [];
+  await Promise.all(picked.map(async ({ r }) => {
+    try {
+      const { buffer } = await downloadBinary(REF_BUCKET, r.path);
+      parts.push({ inlineData: { mimeType: r.mime, data: buffer.toString('base64') } });
+    } catch (e) { /* a missing object never blocks generation */ }
+  }));
+  return parts;
+}
+
 // Stripe fulfillment (activates once stripe_secret_key is saved in Settings).
 // Create one Payment Link per pack in the Stripe dashboard with metadata
 // {credits: N} and a required "phone" custom field. The payload is never
@@ -868,7 +992,7 @@ const IMAGE_MODELS = {
 const DEFAULT_PAID_MODEL = 'gemini-3.1-flash-image';
 const DEFAULT_FREE_MODEL = 'gemini-2.5-flash-image';
 
-async function geminiImage(key, prompt, aspect, model) {
+async function geminiImage(key, prompt, aspect, model, refParts = []) {
   const models = IMAGE_MODELS[model] || IMAGE_MODELS[DEFAULT_FREE_MODEL];
   let lastErr = null;
   for (const model of models) {
@@ -876,7 +1000,7 @@ async function geminiImage(key, prompt, aspect, model) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
+        contents: [{ parts: [...refParts, { text: prompt }] }],
         generationConfig: {
           responseModalities: ['TEXT', 'IMAGE'],
           // Portrait by default: these are looked at on a phone and saved to a
@@ -985,7 +1109,21 @@ app.post('/api/public/nailmind-generate', wrap(async (req, res) => {
   // A credit was spent, so this is a customer: give them the good model.
   const model = acct ? (s.nailmind_model_paid || DEFAULT_PAID_MODEL)
                      : (s.nailmind_model_free || DEFAULT_FREE_MODEL);
-  const jobs = Array.from({ length: n }, (_, i) => geminiImage(key, base + twists[i % twists.length], aspect, model));
+
+  // Reference conditioning: attach the founder's closest real sets as the bar
+  // for realism and design strength. Strictly an upgrade, never a dependency —
+  // no matching references, a missing table, or any error here degrades to the
+  // plain text-to-image path unchanged.
+  let refParts = [];
+  if (String(s.nailmind_refs_enabled ?? '1') !== '0') {
+    try { refParts = await nmPickRefs(`${userPrompt} ${shape} ${length}`, shape); }
+    catch (e) { console.error('reference retrieval skipped:', e.message); }
+  }
+  const withRefs = refParts.length
+    ? base + ' Match the craftsmanship, realism, finish quality and photographic standard of the attached reference photos from our own studio library. The references set the bar for quality and style only — create a fresh design for this request rather than copying any reference.'
+    : base;
+
+  const jobs = Array.from({ length: n }, (_, i) => geminiImage(key, withRefs + twists[i % twists.length], aspect, model, refParts));
   const settled = await Promise.allSettled(jobs);
   const images = settled.filter(x => x.status === 'fulfilled').map(x => x.value);
   if (!images.length) {

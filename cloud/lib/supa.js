@@ -100,6 +100,25 @@ async function uploadBinary(bucket, objectPath, buffer, contentType) {
   return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${objectPath}`;
 }
 
+// Fetch a private object's bytes. The secret key means private buckets work —
+// which is the point: reference images must never have a public URL at all.
+async function downloadBinary(bucket, objectPath) {
+  const r = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${objectPath}`, {
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+  });
+  if (!r.ok) throw new Error(`Object download failed: ${r.status}`);
+  return { buffer: Buffer.from(await r.arrayBuffer()), contentType: r.headers.get('content-type') };
+}
+
+async function deleteBinary(bucket, objectPath) {
+  const r = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${objectPath}`, {
+    method: 'DELETE',
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+  });
+  if (!r.ok && r.status !== 404) throw new Error(`Object delete failed: ${r.status}`);
+  return true;
+}
+
 async function rpc(fn, args = {}) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
     method: 'POST',
@@ -110,4 +129,4 @@ async function rpc(fn, args = {}) {
   return data;
 }
 
-module.exports = { q, ins, upd, del, rpc, uploadBinary, SUPABASE_URL };
+module.exports = { q, ins, upd, del, rpc, uploadBinary, downloadBinary, deleteBinary, SUPABASE_URL };

@@ -187,3 +187,14 @@ a.link { color: var(--gold-deep); cursor: pointer; text-decoration: underline; }
 .lock-card input { width: 100%; text-align: center; font-size: 1.4rem; letter-spacing: .3em; margin: 14px 0 10px; }
 .lock-card button { width: 100%; }
 .appt-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* ── Design references grid ── */
+.ref-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px}
+.ref-card{border:1px solid var(--line,#e5e0d6);border-radius:12px;overflow:hidden;background:#fff}
+.ref-card img{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:#f4f1ea}
+.ref-card.ref-off{opacity:.45}
+.ref-meta{padding:8px 10px 10px}
+.ref-descr{font-size:12.5px;font-weight:600;line-height:1.3;margin-bottom:3px}
+.ref-tags{font-size:11px;color:#9a9184;line-height:1.35;margin-bottom:8px;min-height:15px}
+.ref-actions{display:flex;gap:6px;align-items:center}
+.ref-actions select{font-size:12px;padding:2px 4px}

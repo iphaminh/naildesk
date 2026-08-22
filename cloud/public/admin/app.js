@@ -89,7 +89,7 @@ document.getElementById('lockBtn').onclick = e => {
 const NM_ONLY = /(^|\.)nailmind\.app$/i.test(location.hostname);
 if (NM_ONLY) {
   document.querySelectorAll('#nav a').forEach(a => {
-    if (a.dataset.page !== 'nailmind' && a.dataset.page !== 'settings') a.remove();
+    if (!['nailmind', 'refs', 'settings'].includes(a.dataset.page)) a.remove();
   });
   const brand = document.querySelector('.brand');
   if (brand) brand.innerHTML = '💎 NailMind';
@@ -107,7 +107,7 @@ if (NM_ONLY) {
   // server enforces this too — see the salon host gate in api/index.js; this
   // only keeps a dead link out of the sidebar.
   document.querySelectorAll('#nav a').forEach(a => {
-    if (a.dataset.page === 'nailmind') a.remove();
+    if (a.dataset.page === 'nailmind' || a.dataset.page === 'refs') a.remove();
   });
 }
 
@@ -811,6 +811,98 @@ function techForm(t, services, done) {
 
 /* ---------- NailMind credits ---------- */
 let nmSearch = '';
+/* ── Design references: the private gallery the generator learns from ── */
+pages.refs = async () => {
+  const refs = await api('/api/nailmind/refs').catch(() => null);
+  if (refs === null) {
+    $main.innerHTML = `<h1>Design references</h1>
+      <div class="panel"><div class="empty">The reference gallery is not set up yet — run cloud/migrations/nailmind_ref_designs.sql in Supabase first.</div></div>`;
+    return;
+  }
+  $main.innerHTML = `
+    <h1>Design references</h1>
+    <div class="sub">Private gallery only the generator ever sees — never shown on the site. Upload photos of real sets you rate 8/10 or better; each is auto-tagged, and the closest matches guide every client generation. Quality stars break ties when several match.</div>
+    <div class="toolbar">
+      <button class="gold" id="refAdd">＋ Add photos</button>
+      <input type="file" id="refFile" accept="image/jpeg,image/png,image/webp" multiple style="display:none">
+      <span class="muted" id="refStatus">${refs.length} reference${refs.length === 1 ? '' : 's'}</span>
+    </div>
+    <div class="panel">${refs.length ? `<div class="ref-grid">
+      ${refs.map(r => `
+        <div class="ref-card ${r.enabled ? '' : 'ref-off'}" data-card="${r.id}">
+          <img alt="" data-img="${r.id}">
+          <div class="ref-meta">
+            <div class="ref-descr">${esc(r.descr || 'untagged — delete and re-upload to retry tagging')}</div>
+            <div class="ref-tags">${(r.tags || []).slice(0, 6).map(esc).join(' · ')}</div>
+            <div class="ref-actions">
+              <select data-q="${r.id}" title="Quality — breaks ties between matching references">
+                ${[1, 2, 3, 4, 5].map(n => `<option value="${n}" ${n === Number(r.quality) ? 'selected' : ''}>${'★'.repeat(n)}</option>`).join('')}
+              </select>
+              <button class="small" data-toggle="${r.id}" data-on="${r.enabled ? 1 : 0}">${r.enabled ? 'In use' : 'Paused'}</button>
+              <button class="small" data-del="${r.id}">Delete</button>
+            </div>
+          </div>
+        </div>`).join('')}
+    </div>` : '<div class="empty">No references yet. Add photos of real nail work — your own salon sets are the best possible source.</div>'}</div>`;
+
+  // <img> tags cannot send the PIN header, so thumbnails load as blobs.
+  $main.querySelectorAll('[data-img]').forEach(async img => {
+    try {
+      const r = await fetch(`/api/nailmind/refs/${img.dataset.img}/image`, { headers: { 'x-admin-pin': pin() } });
+      if (r.ok) img.src = URL.createObjectURL(await r.blob());
+    } catch (e) { /* thumbnail only */ }
+  });
+
+  const fileInput = document.getElementById('refFile');
+  document.getElementById('refAdd').onclick = () => fileInput.click();
+  fileInput.onchange = async () => {
+    const files = [...fileInput.files];
+    const status = document.getElementById('refStatus');
+    let done = 0;
+    for (const f of files) {
+      status.textContent = `Uploading ${++done} of ${files.length}… (auto-tagging takes a few seconds each)`;
+      try {
+        const dataUrl = await refDownscale(f);
+        await api('/api/nailmind/refs', { method: 'POST', body: { image: dataUrl } });
+      } catch (e) { alert(`${f.name}: ${e.message}`); }
+    }
+    pages.refs();
+  };
+
+  $main.querySelectorAll('[data-q]').forEach(sel => sel.onchange = async () => {
+    await api(`/api/nailmind/refs/${sel.dataset.q}`, { method: 'PATCH', body: { quality: Number(sel.value) } }).catch(e => alert(e.message));
+  });
+  $main.querySelectorAll('[data-toggle]').forEach(b => b.onclick = async () => {
+    await api(`/api/nailmind/refs/${b.dataset.toggle}`, { method: 'PATCH', body: { enabled: b.dataset.on !== '1' } }).catch(e => alert(e.message));
+    pages.refs();
+  });
+  $main.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+    if (!confirm('Delete this reference? The generator stops using it immediately.')) return;
+    await api(`/api/nailmind/refs/${b.dataset.del}`, { method: 'DELETE' }).catch(e => alert(e.message));
+    pages.refs();
+  });
+};
+
+// Phone photos are 4-12 MB; the model reads style fine from 1280px. Downscaling
+// in the browser keeps uploads fast and the bucket small.
+function refDownscale(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const max = 1280;
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * scale);
+      c.height = Math.round(img.height * scale);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      resolve(c.toDataURL('image/jpeg', 0.87));
+    };
+    img.onerror = () => reject(new Error('Could not read that image'));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 pages.nailmind = async () => {
   if (!posSettings) posSettings = await api('/api/settings').catch(() => null);
   const accounts = await api(`/api/nailmind/accounts?search=${encodeURIComponent(nmSearch)}`).catch(e => null);
