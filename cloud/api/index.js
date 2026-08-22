@@ -26,8 +26,10 @@ app.use((req, res, next) => {
   }
   if (req.path.startsWith('/admin/')) return next();
   // /terms and /privacy without the extension — these get printed on receipts
-  // and pasted into App Store Connect, so they should be typeable.
-  if (req.path === '/terms' || req.path === '/privacy') {
+  // and pasted into App Store Connect, so they should be typeable. The guide
+  // is here for the same reason: it is a URL people share.
+  if (req.path === '/terms' || req.path === '/privacy'
+      || req.path === '/best-ai-nail-design-apps') {
     return res.sendFile(path.join(__dirname, '..', 'public', 'landing', req.path.slice(1) + '.html'));
   }
   if (req.path.startsWith('/api/')) {
