@@ -2,16 +2,16 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "nail-pos",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["server.js"],
-      "port": 3789
-    },
-    {
-      "name": "dream-nails-cloud",
+      "name": "naildesk",
       "runtimeExecutable": "node",
       "runtimeArgs": ["cloud/server.js"],
       "port": 3000
+    },
+    {
+      "name": "naildesk-legacy-sqlite",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["legacy/server.js"],
+      "port": 3789
     }
   ]
 }

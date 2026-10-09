@@ -1,75 +1,65 @@
-# Dream Nails + NailMind
+# NailDesk
 
-Two products, one codebase, one Node server. Which one you get depends on the
-domain you arrive on.
+The salon platform behind **Dream Nails & Spa** (Vacaville, CA) at
+dreamnails.phaminh.com: online booking for clients, a check-in kiosk, and the
+front-desk POS and customer system for staff.
 
-| Domain | What it serves | Who it's for |
+**Where the project stands and what's next: [`PROJECT.md`](PROJECT.md).**
+
+| Page | Who uses it | What it is |
 |---|---|---|
-| **nailmind.app** | Landing page at `/`, AI design studio at `/app` | The global consumer product |
-| **dreamnails.phaminh.com** | Booking, POS admin, check-in kiosk, studio | Dream Nails & Spa, Vacaville |
-
-A host gate at the top of `cloud/api/index.js` enforces the split: on
-nailmind.app the salon's POS, booking and kiosk routes return 404, so the
-product domain can never reach salon data.
+| `/` | Clients | Online booking — service, tech, time, optional inspo photo (sold as **NailBook**) |
+| `/kiosk` | Clients | Check-in at the counter |
+| `/admin` | Staff (PIN) | Dashboard, appointments, checkout, customers, services, techs, reports, import, settings |
+| `/nailmind` | — | Redirects to the NailMind studio at nailmind.app |
 
 ## Layout
 
 ```
-cloud/
-  server.js          Node entry point (Hostinger)
-  api/index.js       every route — host gate, salon POS, NailMind, Stripe
-  lib/supa.js        database client
-  lib/secrets.json   database key — GITIGNORED, ships only in the deploy archive
-  public/
-    index.html       salon booking (NailBook)
-    kiosk.html       salon check-in
-    admin/           salon POS + NailMind credit sales (PIN protected)
-    nailmind.html    the AI studio
-    landing/         nailmind.app marketing page (copy of nailmind-landing/)
-    gallery/v3/      97 AI-generated gallery images
-  migrations/        SQL applied to Supabase, newest last
-nailmind-landing/    source of the marketing page
+cloud/      the live app — Node + Express, deployed to Hostinger
+landing/    NailDesk marketing page (static)
+legacy/     the original local SQLite POS, superseded by cloud/
 ```
 
 ## Running locally
 
 ```bash
-PORT=3100 node cloud/server.js
+cd cloud
+npm ci
+SUPABASE_URL=https://maqsptfpfdgcxielnnrz.supabase.co SUPABASE_KEY=… PORT=3100 node server.js
 ```
 
-Then `http://localhost:3100` for the salon, and to see the product domain:
-
-```bash
-curl -H "Host: nailmind.app" http://localhost:3100/app
-```
+Open `http://localhost:3100`. This is the salon's real database — anything you
+save locally is saved for real. The key can also go in `cloud/lib/secrets.json`
+(see `cloud/lib/README-secrets.md`).
 
 ## Deploying
 
-Both sites run the same archive. Build it from `cloud/` including
-`lib/secrets.json` (which git ignores), then deploy to each domain via
-Hostinger. Gallery images are served from `/gallery/v3/` — bump the version
-folder when regenerating so the CDN can't serve stale images.
+Hostinger Node.js hosting. Upload the contents of `cloud/` (without
+`node_modules/`) to the app, keeping the `lib/secrets.json` already on the
+server — git never has it. Clients book through this site every week: after a
+deploy, open `/` and make one test booking.
+
+*To do: write the exact Hostinger steps here the next time you deploy.*
 
 ## Services
 
-- **Supabase** — Postgres + Storage. The server authenticates with the secret
-  key, which bypasses row level security; no policy grants the anon key
-  anything (see `migrations/lock_down_rls.sql`).
-- **Stripe** — server-created Checkout Sessions; the webhook re-verifies each
-  session with Stripe before adding credits, and `nailmind_stripe_events`
-  makes double-crediting impossible.
-- **Google Gemini** — image generation. Key lives in the `settings` table and
-  is never returned over the API.
-
-## Credits
-
-One credit buys one generation. Every movement — welcome grant, spend,
-purchase, front-desk sale, refund — is one row in `nailmind_ledger`, written
-by `nm_credit_adjust()`, which row-locks the account so concurrent changes
-can't corrupt a balance.
+- **Supabase** — Postgres, project `dream-nails-pos`. The server authenticates
+  with the secret key, which bypasses row level security; no policy grants the
+  anon key anything (see `migrations/lock_down_rls.sql`).
+- **Twilio** — texts the owner when a booking comes in.
 
 ## Secrets
 
 Nothing live belongs in this repo. The database key lives in
-`cloud/lib/secrets.json` (gitignored); Stripe, Google and Twilio keys live in
+`cloud/lib/secrets.json` (gitignored); the Twilio keys and the admin PIN live in
 the `settings` table and are redacted out of every API response.
+
+## Related
+
+Split out of `iphaminh/nail-pos-system` in October 2026, with its history.
+
+- **[nailmind](https://github.com/iphaminh/nailmind)** — the AI nail-design
+  studio, its own product and database.
+- **[nailbook](https://github.com/iphaminh/nailbook)** — the booking product's
+  landing page and notes. The booking engine itself is here.

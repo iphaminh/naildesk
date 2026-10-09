@@ -1,7 +1,0 @@
-{
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" },
-    { "source": "/kiosk", "destination": "/kiosk.html" },
-    { "source": "/nailmind", "destination": "/nailmind.html" }
-  ]
-}

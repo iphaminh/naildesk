@@ -1,4 +1,4 @@
-// Thin PostgREST client for the dream-nails-pos Supabase project.
+// Thin PostgREST client for the Dream Nails salon's Supabase project.
 //
 // This key is the database's master key — it must NEVER reach a browser and must
 // never be committed. It is read from the environment, or from lib/secrets.json,

@@ -1,13 +1,15 @@
 node_modules/
-data/
 *.log
-.DS_Store
-.mcp.json
-.claude/settings.local.json
 nohup.out
 *.tar.gz
-cloud/lib/secrets.json
-
-# never publish: the working copy lives in iCloud, keep sync junk out of git
 .DS_Store
+# The working copy may live in iCloud — keep its sync placeholders out of git.
 *.icloud
+.mcp.json
+.claude/settings.local.json
+
+# The legacy SQLite POS keeps its database in legacy/data/.
+data/
+
+# The database key ships only inside the deploy archive — cloud/lib/README-secrets.md
+cloud/lib/secrets.json

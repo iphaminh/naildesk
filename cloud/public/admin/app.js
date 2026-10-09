@@ -84,39 +84,12 @@ document.getElementById('lockBtn').onclick = e => {
   showLock();
 };
 
-/* On nailmind.app this admin manages the app only — the salon's pages live on
-   the salon's own site and have no data here, so hide them. */
-const NM_ONLY = /(^|\.)nailmind\.app$/i.test(location.hostname);
-if (NM_ONLY) {
-  document.querySelectorAll('#nav a').forEach(a => {
-    if (!['nailmind', 'refs', 'settings'].includes(a.dataset.page)) a.remove();
-  });
-  const brand = document.querySelector('.brand');
-  if (brand) brand.innerHTML = '💎 NailMind';
-  const foot = document.querySelector('.sidebar-foot');
-  if (foot) foot.innerHTML = 'App pages:<br><a class="foot-link" href="/" target="_blank">Landing ↗</a><br>'
-    + '<a class="foot-link" href="/app" target="_blank">Studio ↗</a>'
-    + '<div style="margin-top:10px"><a class="foot-link" href="#" id="lockBtn2">🔒 Lock</a></div>';
-  const lb = document.getElementById('lockBtn2');
-  if (lb) lb.onclick = e => { e.preventDefault(); localStorage.removeItem('adminPin'); showLock(); };
-  if (!location.hash) location.hash = '#nailmind';
-} else {
-  // The mirror image, and the more important half: NailMind's customers and
-  // their credit balances have no business being reachable from the salon's
-  // register, which the whole front desk unlocks with one shared PIN. The
-  // server enforces this too — see the salon host gate in api/index.js; this
-  // only keeps a dead link out of the sidebar.
-  document.querySelectorAll('#nav a').forEach(a => {
-    if (a.dataset.page === 'nailmind' || a.dataset.page === 'refs') a.remove();
-  });
-}
-
 /* ---------- router ---------- */
 const pages = {};
 function navigate() {
-  const page = (location.hash || (NM_ONLY ? '#nailmind' : '#dashboard')).slice(1).split('/')[0];
+  const page = (location.hash || '#dashboard').slice(1).split('/')[0];
   document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('active', a.dataset.page === page));
-  (pages[page] || (NM_ONLY ? pages.nailmind : pages.dashboard))();
+  (pages[page] || pages.dashboard)();
 }
 window.addEventListener('hashchange', navigate);
 
@@ -809,197 +782,6 @@ function techForm(t, services, done) {
   m.querySelector('#tfName').focus();
 }
 
-/* ---------- NailMind credits ---------- */
-let nmSearch = '';
-/* ── Design references: the private gallery the generator learns from ── */
-pages.refs = async () => {
-  const refs = await api('/api/nailmind/refs').catch(() => null);
-  if (refs === null) {
-    $main.innerHTML = `<h1>Design references</h1>
-      <div class="panel"><div class="empty">The reference gallery is not set up yet — run cloud/migrations/nailmind_ref_designs.sql in Supabase first.</div></div>`;
-    return;
-  }
-  $main.innerHTML = `
-    <h1>Design references</h1>
-    <div class="sub">Private gallery only the generator ever sees — never shown on the site. Upload photos of real sets you rate 8/10 or better; each is auto-tagged, and the closest matches guide every client generation. Quality stars break ties when several match.</div>
-    <div class="toolbar">
-      <button class="gold" id="refAdd">＋ Add photos</button>
-      <input type="file" id="refFile" accept="image/jpeg,image/png,image/webp" multiple style="display:none">
-      <span class="muted" id="refStatus">${refs.length} reference${refs.length === 1 ? '' : 's'}</span>
-    </div>
-    <div class="panel">${refs.length ? `<div class="ref-grid">
-      ${refs.map(r => `
-        <div class="ref-card ${r.enabled ? '' : 'ref-off'}" data-card="${r.id}">
-          <img alt="" data-img="${r.id}">
-          <div class="ref-meta">
-            <div class="ref-descr">${esc(r.descr || 'untagged — delete and re-upload to retry tagging')}</div>
-            <div class="ref-tags">${(r.tags || []).slice(0, 6).map(esc).join(' · ')}</div>
-            <div class="ref-actions">
-              <select data-q="${r.id}" title="Quality — breaks ties between matching references">
-                ${[1, 2, 3, 4, 5].map(n => `<option value="${n}" ${n === Number(r.quality) ? 'selected' : ''}>${'★'.repeat(n)}</option>`).join('')}
-              </select>
-              <button class="small" data-toggle="${r.id}" data-on="${r.enabled ? 1 : 0}">${r.enabled ? 'In use' : 'Paused'}</button>
-              <button class="small" data-del="${r.id}">Delete</button>
-            </div>
-          </div>
-        </div>`).join('')}
-    </div>` : '<div class="empty">No references yet. Add photos of real nail work — your own salon sets are the best possible source.</div>'}</div>`;
-
-  // <img> tags cannot send the PIN header, so thumbnails load as blobs.
-  $main.querySelectorAll('[data-img]').forEach(async img => {
-    try {
-      const r = await fetch(`/api/nailmind/refs/${img.dataset.img}/image`, { headers: { 'x-admin-pin': pin() } });
-      if (r.ok) img.src = URL.createObjectURL(await r.blob());
-    } catch (e) { /* thumbnail only */ }
-  });
-
-  const fileInput = document.getElementById('refFile');
-  document.getElementById('refAdd').onclick = () => fileInput.click();
-  fileInput.onchange = async () => {
-    const files = [...fileInput.files];
-    const status = document.getElementById('refStatus');
-    let done = 0;
-    for (const f of files) {
-      status.textContent = `Uploading ${++done} of ${files.length}… (auto-tagging takes a few seconds each)`;
-      try {
-        const dataUrl = await refDownscale(f);
-        await api('/api/nailmind/refs', { method: 'POST', body: { image: dataUrl } });
-      } catch (e) { alert(`${f.name}: ${e.message}`); }
-    }
-    pages.refs();
-  };
-
-  $main.querySelectorAll('[data-q]').forEach(sel => sel.onchange = async () => {
-    await api(`/api/nailmind/refs/${sel.dataset.q}`, { method: 'PATCH', body: { quality: Number(sel.value) } }).catch(e => alert(e.message));
-  });
-  $main.querySelectorAll('[data-toggle]').forEach(b => b.onclick = async () => {
-    await api(`/api/nailmind/refs/${b.dataset.toggle}`, { method: 'PATCH', body: { enabled: b.dataset.on !== '1' } }).catch(e => alert(e.message));
-    pages.refs();
-  });
-  $main.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
-    if (!confirm('Delete this reference? The generator stops using it immediately.')) return;
-    await api(`/api/nailmind/refs/${b.dataset.del}`, { method: 'DELETE' }).catch(e => alert(e.message));
-    pages.refs();
-  });
-};
-
-// Phone photos are 4-12 MB; the model reads style fine from 1280px. Downscaling
-// in the browser keeps uploads fast and the bucket small.
-function refDownscale(file) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const max = 1280;
-      const scale = Math.min(1, max / Math.max(img.width, img.height));
-      const c = document.createElement('canvas');
-      c.width = Math.round(img.width * scale);
-      c.height = Math.round(img.height * scale);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(img.src);
-      resolve(c.toDataURL('image/jpeg', 0.87));
-    };
-    img.onerror = () => reject(new Error('Could not read that image'));
-    img.src = URL.createObjectURL(file);
-  });
-}
-
-pages.nailmind = async () => {
-  if (!posSettings) posSettings = await api('/api/settings').catch(() => null);
-  const accounts = await api(`/api/nailmind/accounts?search=${encodeURIComponent(nmSearch)}`).catch(e => null);
-  if (accounts === null) {
-    $main.innerHTML = `<h1>NailMind credits</h1>
-      <div class="panel"><div class="empty">Credit accounts are not set up yet — run the NailMind credits migration in Supabase first (cloud/migrations/nailmind_credits.sql).</div></div>`;
-    return;
-  }
-  $main.innerHTML = `
-    <h1>NailMind credits</h1>
-    <div class="sub">Sell design credits at the front desk. 1 credit = 1 AI generation. Clients sign in on NailMind with their phone number.</div>
-    <div class="toolbar">
-      <input type="search" id="nmQ" placeholder="Search phone or name…" value="${esc(nmSearch)}">
-      <button class="gold" id="nmSell">＋ Sell / grant credits</button>
-    </div>
-    <div class="panel">${accounts.length ? `<table><thead><tr><th>Phone</th><th>Name</th><th class="num">Credits</th><th>Member since</th><th></th></tr></thead>
-      <tbody>${accounts.map(a => `<tr>
-        <td><b>${esc(a.phone)}</b></td><td>${esc(a.name || '')}</td>
-        <td class="num"><span class="badge ${Number(a.credits) > 0 ? 'paid' : 'open'}">${Number(a.credits)}</span></td>
-        <td class="muted">${String(a.created_at).slice(0, 10)}</td>
-        <td class="num">
-          <button class="small" data-sell="${esc(a.phone)}">Sell credits</button>
-          <button class="small" data-ledger="${a.id}" data-phone="${esc(a.phone)}">History</button>
-        </td></tr>`).join('')}</tbody></table>`
-    : `<div class="empty">No NailMind members yet. When a client signs in on the NailMind page, they appear here.</div>`}</div>`;
-  let timer;
-  document.getElementById('nmQ').oninput = e => { clearTimeout(timer); timer = setTimeout(() => { nmSearch = e.target.value; pages.nailmind(); }, 300); };
-  document.getElementById('nmSell').onclick = () => nmSellForm('');
-  $main.querySelectorAll('[data-sell]').forEach(b => b.onclick = () => nmSellForm(b.dataset.sell));
-  $main.querySelectorAll('[data-ledger]').forEach(b => b.onclick = async () => {
-    const rows = await api(`/api/nailmind/accounts/${b.dataset.ledger}/ledger`);
-    const refunded = new Set(rows.filter(r => r.reason === 'refund').map(r => String(r.ref)));
-    const isPurchase = r => Number(r.delta) > 0 && ['stripe purchase', 'front-desk sale', 'starter pack'].includes(r.reason);
-    modal(`<h3>Credit history — ${esc(b.dataset.phone)}</h3>
-      ${rows.length ? `<table><thead><tr><th>When</th><th>What</th><th class="num">Credits</th><th></th></tr></thead><tbody>
-        ${rows.map(r => `<tr><td class="muted">${String(r.created_at).slice(0, 16).replace('T', ' ')}</td>
-          <td>${esc(r.reason)}${r.ref ? ` <span class="muted">· ${esc(String(r.ref).slice(0, 28))}</span>` : ''}</td>
-          <td class="num" style="color:${Number(r.delta) >= 0 ? 'var(--green)' : 'var(--red)'}">${Number(r.delta) >= 0 ? '+' : ''}${Number(r.delta)}</td>
-          <td class="num">${isPurchase(r)
-            ? (refunded.has(String(r.ref)) || refunded.has('ledger:' + r.id)
-                ? '<span class="badge void">refunded</span>'
-                : `<button class="small danger" data-refund="${r.id}" data-acct="${b.dataset.ledger}" data-ph="${esc(b.dataset.phone)}">Refund</button>`)
-            : ''}</td></tr>`).join('')}</tbody></table>
-        <p class="muted" style="font-size:.8rem;margin-top:10px">Refunding sends the money back through Stripe and removes any credits they have not used yet. A refund always costs less than a chargeback — when in doubt, refund.</p>`
-      : '<div class="empty">No activity yet.</div>'}
-      <div class="actions"><button onclick="document.getElementById('modal-root').innerHTML=''">Close</button></div>`);
-    document.querySelectorAll('[data-refund]').forEach(rb => rb.onclick = async () => {
-      if (!confirm(`Refund this purchase for ${rb.dataset.ph}?\n\nThe money goes back to their card and unused credits are removed.`)) return;
-      rb.disabled = true; rb.textContent = 'Refunding…';
-      try {
-        const out = await api('/api/nailmind/refund', { method: 'POST', body: { ledger_id: Number(rb.dataset.refund) } });
-        toast(out.refunded_dollars !== null
-          ? `Refunded ${fmt$(out.refunded_dollars)} · ${out.credits_removed} credits removed`
-          : `${out.credits_removed} credits removed`);
-        closeModal();
-        if (pages.nailmind) pages.nailmind();
-      } catch (e) { toast(e.message, true); rb.disabled = false; rb.textContent = 'Refund'; }
-    });
-  });
-};
-
-function nmSellForm(phone) {
-  const packs = String(posSettings?.nailmind_packs || '10:5,25:10,60:20').split(',').map(p => p.split(':').map(Number));
-  const m = modal(`
-    <h3>Sell / grant NailMind credits</h3>
-    <p class="muted" style="font-size:.85rem;margin-bottom:12px">Take payment in the POS as usual (custom item "NailMind credits"), then add the credits here.</p>
-    <div class="row" style="margin-bottom:12px">
-      <div class="field"><label>Client phone *</label><input id="nmsPhone" type="tel" value="${esc(phone)}" placeholder="707-555-1234"></div>
-      <div class="field" style="max-width:120px"><label>Credits *</label><input id="nmsCredits" type="number" step="1"></div>
-    </div>
-    <div class="row" style="margin-bottom:12px">
-      ${packs.map(([c, d]) => c > 0 ? `<button class="small" data-pk="${c}" data-pd="${d}">${c} for $${d}</button>` : '').join('')}
-    </div>
-    <div class="field"><label>Note (optional)</label><input id="nmsNote" placeholder="e.g. paid cash, ticket #12" style="width:100%"></div>
-    <div class="actions">
-      <button onclick="document.getElementById('modal-root').innerHTML=''">Cancel</button>
-      <button class="primary" id="nmsGo">Add credits</button>
-    </div>`);
-  m.querySelectorAll('[data-pk]').forEach(b => b.onclick = () => {
-    m.querySelector('#nmsCredits').value = b.dataset.pk;
-    if (!m.querySelector('#nmsNote').value) m.querySelector('#nmsNote').value = `$${b.dataset.pd} pack`;
-  });
-  m.querySelector('#nmsGo').onclick = async () => {
-    try {
-      const r = await api('/api/nailmind/credits/grant', { method: 'POST', body: {
-        phone: m.querySelector('#nmsPhone').value,
-        credits: m.querySelector('#nmsCredits').value,
-        note: m.querySelector('#nmsNote').value
-      } });
-      closeModal();
-      toast(`${r.phone} now has ${r.credits} credits`);
-      if (pages.nailmind) pages.nailmind();
-    } catch (e) { toast(e.message, true); }
-  };
-  m.querySelector(phone ? '#nmsCredits' : '#nmsPhone').focus();
-}
-
 /* ---------- reports ---------- */
 pages.reports = async () => {
   const to = new Date().toLocaleDateString('sv-SE');
@@ -1116,28 +898,6 @@ pages.settings = async () => {
         <div class="field"><label>Slot minutes</label><input id="stStep" type="number" value="${esc(s.slot_minutes || 30)}"></div>
         <div class="field"><label>Bookings per slot</label><input id="stCapS" type="number" value="${esc(s.slot_capacity || 3)}"></div>
       </div>
-      <h2>NailMind AI images</h2>
-      <p class="muted" style="font-size:.8rem;margin-bottom:10px">Paste a Google AI Studio key (aistudio.google.com — image generation needs billing enabled on the key). About 4 cents per image; the daily cap below is your spending brake for guest use.</p>
-      <div class="row" style="margin-bottom:12px">
-        <div class="field"><label>Google AI API key</label><input id="stGKey" type="password" value="${esc(secretVal(s.gemini_api_key))}" placeholder="${esc(secretPh(s.gemini_api_key, 'AIza...'))}"></div>
-        <div class="field"><label>Images per tap</label><input id="stGN" type="number" min="1" max="6" value="${esc(s.nailmind_images_per_generate || 3)}"></div>
-        <div class="field"><label>Guest daily image cap</label><input id="stGCap" type="number" value="${esc(s.nailmind_daily_limit || 60)}"></div>
-      </div>
-      <h2>NailMind credits</h2>
-      <p class="muted" style="font-size:.8rem;margin-bottom:10px">Members sign in on NailMind with their phone. New members get welcome credits; after that they buy packs (sold at the front desk on the 💎 NailMind page, or online via Stripe Payment Links pasted below).</p>
-      <div class="row" style="margin-bottom:12px">
-        <div class="field"><label>Welcome credits (new member)</label><input id="stNmWelcome" type="number" value="${esc(s.nailmind_welcome_credits ?? 3)}"></div>
-        <div class="field"><label>Packs (credits:$, comma-separated)</label><input id="stNmPacks" value="${esc(s.nailmind_packs || '10:5,25:10,60:20')}"></div>
-      </div>
-      <p class="muted" style="font-size:.78rem;margin-bottom:8px">Payment links are matched to packs by credit count — these three cover the 10 / 25 / 60 packs. If you change pack sizes above, tell Claude to re-map the links.</p>
-      <div class="row" style="margin-bottom:12px">
-        <div class="field"><label>Stripe link — 10-credit pack</label><input id="stNmL1" value="${esc(s.stripe_link_10 || '')}" placeholder="https://buy.stripe.com/…"></div>
-        <div class="field"><label>Stripe link — 25-credit pack</label><input id="stNmL2" value="${esc(s.stripe_link_25 || '')}" placeholder="https://buy.stripe.com/…"></div>
-        <div class="field"><label>Stripe link — 60-credit pack</label><input id="stNmL3" value="${esc(s.stripe_link_60 || '')}" placeholder="https://buy.stripe.com/…"></div>
-      </div>
-      <div class="row" style="margin-bottom:12px">
-        <div class="field"><label>Stripe secret key (auto-credit online buys)</label><input id="stNmSk" type="password" value="${esc(secretVal(s.stripe_secret_key))}" placeholder="${esc(secretPh(s.stripe_secret_key, 'sk_live_…'))}"></div>
-      </div>
       <h2>Text alerts (your existing Twilio account)</h2>
       <p class="muted" style="font-size:.8rem;margin-bottom:10px">Paste the same values from your nails-by-minh Vercel settings. Same account, same number, nothing new to buy. The system texts YOUR cell when a booking comes in.</p>
       <div class="row" style="margin-bottom:12px">
@@ -1184,15 +944,6 @@ pages.settings = async () => {
       close_time: document.getElementById('stClose').value,
       slot_minutes: document.getElementById('stStep').value,
       slot_capacity: document.getElementById('stCapS').value,
-      gemini_api_key: document.getElementById('stGKey').value.trim() || '__SET__',
-      nailmind_images_per_generate: document.getElementById('stGN').value,
-      nailmind_daily_limit: document.getElementById('stGCap').value,
-      nailmind_welcome_credits: document.getElementById('stNmWelcome').value,
-      nailmind_packs: document.getElementById('stNmPacks').value.trim(),
-      stripe_link_10: document.getElementById('stNmL1').value.trim(),
-      stripe_link_25: document.getElementById('stNmL2').value.trim(),
-      stripe_link_60: document.getElementById('stNmL3').value.trim(),
-      stripe_secret_key: document.getElementById('stNmSk').value.trim() || '__SET__',
       twilio_sid: document.getElementById('stTwSid').value.trim() || '__SET__',
       twilio_token: document.getElementById('stTwTok').value.trim() || '__SET__',
       twilio_from: document.getElementById('stTwFrom').value.trim(),
