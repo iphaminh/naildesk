@@ -57,9 +57,9 @@ and kiosk are built and loaded with real customers but not adopted yet.
 In order, each with why.
 
 1. **Wake the database — clients can't book online until then.** First free
-   one of the 2 free slots: the other awake project is in a different Supabase
-   organization (not identified yet). Pause it if it isn't needed, or move a
-   project to a paid plan. Then supabase.com/dashboard → organization
+   one of the 2 free slots. The other awake project is **growth-engine**, in a
+   separate Supabase organization (identified 26 October). Pause it if it isn't
+   needed, or move a project to a paid plan. Then supabase.com/dashboard → organization
    **Nailbyminh** → **dream-nails-pos** → **Resume project**. Possible for 90
    days after 9 October, so until about 7 January 2027.
 2. **Deploy from this repository only after a quick check.** The split changes
